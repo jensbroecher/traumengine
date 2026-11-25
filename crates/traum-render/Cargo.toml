@@ -1,0 +1,16 @@
+[package]
+name = "traum-render"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+traum-core = { path = "../traum-core" }
+traum-input = { path = "../traum-input" }
+traum-sdf = { path = "../traum-sdf" }
+traum-editor = { path = "../traum-editor" }
+glam.workspace = true
+bytemuck.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+pollster.workspace = true
+log.workspace = true

@@ -1,0 +1,20 @@
+[package]
+name = "traum-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "traum-engine"
+path = "src/main.rs"
+
+[dependencies]
+traum-core = { path = "../traum-core" }
+traum-input = { path = "../traum-input" }
+traum-sdf = { path = "../traum-sdf" }
+traum-render = { path = "../traum-render" }
+traum-editor = { path = "../traum-editor" }
+glam.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+env_logger.workspace = true
+log.workspace = true

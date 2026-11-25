@@ -1,0 +1,11 @@
+[package]
+name = "traum-input"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+traum-core = { path = "../traum-core" }
+glam.workspace = true
+winit.workspace = true
+gilrs.workspace = true
+log.workspace = true

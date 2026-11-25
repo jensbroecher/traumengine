@@ -1,0 +1,13 @@
+[package]
+name = "traum-editor"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+traum-core = { path = "../traum-core" }
+traum-input = { path = "../traum-input" }
+traum-sdf = { path = "../traum-sdf" }
+glam.workspace = true
+serde.workspace = true
+ron.workspace = true
+log.workspace = true
