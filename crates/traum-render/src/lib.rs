@@ -2007,7 +2007,6 @@ impl TraumRenderer {
     }
 
     fn push_help_guide_card(&mut self, vp: Vec2, s: f32) {
-        let card_w = (440.0 * s).min(vp.x - 40.0 * s);
         let rows = [
             ("Camera Orbit / Pan:", "Right-Drag / Middle-Drag / 2-Finger"),
             ("Zoom In & Out:", "Scroll Wheel / 2-Finger Pinch"),
@@ -2017,18 +2016,34 @@ impl TraumRenderer {
             ("Animate Live Path:", "Animate Tab -> Record -> Drag Toy!"),
             ("Explore in Play Mode:", "Tab -> WASD + Space to Jump!"),
         ];
-        let title_px = 13.0 * s;
-        let row_px = 11.2 * s;
-        let pad = 15.0 * s;
-        let row_step = row_px * 1.72;
-        let card_h = pad * 2.0 + title_px + 14.0 * s + (rows.len() as f32) * row_step;
+        let header = "Traum Engine — Quick Controls Guide (Click Guide to Close)";
+        let title_px = 12.8 * s;
+        let row_px = 10.6 * s;
+        let pad = 16.0 * s;
+        let row_step = row_px * 1.85;
+
+        // Compute exact required card width so left & right columns NEVER overlap!
+        let max_row_w = rows
+            .iter()
+            .map(|(k, v)| {
+                font::measure_text_width(k, row_px)
+                    + 28.0 * s
+                    + font::measure_text_width(v, row_px)
+            })
+            .fold(0.0_f32, f32::max);
+        let header_w = font::measure_text_width(header, title_px);
+        let card_w = (max_row_w.max(header_w) + pad * 2.0)
+            .max(460.0 * s)
+            .min(vp.x - 32.0 * s);
+
+        let card_h = pad * 2.0 + title_px + 18.0 * s + (rows.len() as f32) * row_step;
         let x0 = (vp.x - card_w) * 0.5;
         let y0 = ((vp.y - card_h) * 0.46).max(74.0 * s);
 
         self.ui_quads_scratch.push(GpuUiQuad {
             rect_px: [x0 - 8.0 * s, y0 - 2.0 * s, x0 + card_w + 8.0 * s, y0 + card_h + 12.0 * s],
             uv_rect: [-1.0; 4],
-            fill_color: [0.01, 0.02, 0.05, 0.70],
+            fill_color: [0.01, 0.02, 0.05, 0.72],
             border_color: [0.0; 4],
             params: [20.0 * s, 10.0 * s, 0.0, 2.0],
         });
@@ -2040,17 +2055,26 @@ impl TraumRenderer {
             params: [18.0 * s, 1.8 * s, 0.0, 0.0],
         });
 
-        let header = "Traum Engine — Quick Controls Guide (Click Guide to Close)";
-        let hw = font::measure_text_width(header, title_px * 0.9);
+        let clipped_header = clip_text_to_width(header, title_px, card_w - pad * 2.0);
+        let hw = font::measure_text_width(&clipped_header, title_px);
         push_text_quads(
             &mut self.ui_quads_scratch,
-            header,
+            &clipped_header,
             Vec2::new((vp.x - hw) * 0.5, y0 + pad),
-            title_px * 0.9,
+            title_px,
             [0.58, 0.86, 1.0, 1.0],
         );
 
-        let mut ry = y0 + pad + title_px + 12.0 * s;
+        let div_y = y0 + pad + title_px + 7.0 * s;
+        self.ui_quads_scratch.push(GpuUiQuad {
+            rect_px: [x0 + pad, div_y, x0 + card_w - pad, div_y + 1.2 * s],
+            uv_rect: [-1.0; 4],
+            fill_color: [0.35, 0.42, 0.58, 0.55],
+            border_color: [0.0; 4],
+            params: [1.0, 0.0, 0.0, 0.0],
+        });
+
+        let mut ry = div_y + 9.0 * s;
         for (k, v) in rows {
             push_text_quads(
                 &mut self.ui_quads_scratch,

@@ -57,9 +57,9 @@ impl BrushSettings {
     }
 }
 
-/// Surface-Magnet 3D Imp state (visualized as a glowing 3D cursor + ground drop-shadow).
+/// Surface-Magnet 3D Spark Cursor state (visualized as a glowing 3D ring + ground drop-shadow).
 #[derive(Debug, Clone)]
-pub struct ImpCursor {
+pub struct SparkCursor {
     pub world_pos: Vec3,
     pub surface_normal: Vec3,
     pub ground_shadow_pos: Vec3,
@@ -68,7 +68,9 @@ pub struct ImpCursor {
     last_hit_distance: f32,
 }
 
-impl Default for ImpCursor {
+pub type ImpCursor = SparkCursor;
+
+impl Default for SparkCursor {
     fn default() -> Self {
         Self {
             world_pos: Vec3::new(0.0, 0.5, 0.0),
@@ -434,7 +436,7 @@ impl TraumEditor {
         }
         if input.cycle_fleck {
             self.brush.fleck_style = self.brush.fleck_style.next();
-            self.set_toast(format!("Fleck Style: {}", self.brush.fleck_style.label()));
+            self.set_toast(format!("Brush Style: {}", self.brush.fleck_style.label()));
         }
 
         // Update Imp first so hover-sensitive actions (`Scope In`, `Clone`, `+ Limb`) know which prop is under the cursor!
@@ -589,12 +591,12 @@ impl TraumEditor {
                     .count();
                 if clones > 1 {
                     self.set_toast(format!(
-                        "SCOPED INTO {} ({clones} Live Clones will update together! Enter to Scope Out)",
+                        "Editing Inside {} ({clones} Linked Copies update together! Enter to Exit)",
                         prop.name
                     ));
                 } else {
                     self.set_toast(format!(
-                        "SCOPED INTO {} — Sculpt & Paint in local space! Press Enter to Scope Out.",
+                        "Editing Inside {} — Sculpt & Paint in solo mode! Press Enter to Exit.",
                         prop.name
                     ));
                 }
@@ -608,7 +610,7 @@ impl TraumEditor {
     pub fn scope_out(&mut self) {
         self.finish_stroke();
         if self.scoped_prop_id.take().is_some() {
-            self.set_toast("Scoped Out to World Island!");
+            self.set_toast("Returned to World Island!");
         }
     }
 
@@ -677,7 +679,7 @@ impl TraumEditor {
         });
         self.redo_stack.clear();
         self.set_toast(format!(
-            "Created & Scoped Into Toy #{prop_id}! Sculpt right on it, or press Enter to Scope Out."
+            "Created & Entered Toy #{prop_id}! Sculpt right on it, or press Enter to Exit."
         ));
     }
 
@@ -759,7 +761,7 @@ impl TraumEditor {
         });
         self.redo_stack.clear();
         self.set_toast(
-            "Live-Cloned Toy! Drag to place — Scope In (Enter) on any clone to edit all siblings at once!",
+            "Linked Copy created! Drag to place — Edit Inside (Enter) on any copy to update all twins at once!",
         );
     }
 
@@ -2129,7 +2131,7 @@ impl TraumEditor {
                 cast_shadow: true,
                 action: Some(UiAction::ToggleScope),
                 tooltip: Some((
-                    "Exit Toy Edit Mode (Scope Out)".into(),
+                    "Exit Toy Edit Mode".into(),
                     "Enter or Esc".into(),
                     "Leaves solo toy editing and returns your brush to sculpting the main Floating Island.".into(),
                 )),
@@ -2295,7 +2297,7 @@ impl TraumEditor {
                         8,
                         scope_on,
                         UiAction::ToggleScope,
-                        "Edit Inside Toy (Scope In/Out)",
+                        "Edit Inside Toy",
                         "Key: Enter",
                         "Point at any movable Toy and click this (or press Enter) to sculpt that toy by itself without touching the ground!",
                     ),
@@ -3463,7 +3465,7 @@ impl TraumEditor {
             }
             2 => {
                 self.brush.mode = EditorMode::Paint;
-                self.set_toast("Paint: Coat Flecks & Color");
+                self.set_toast("Paint: Coat Brush Dabs & Color");
             }
             3 => self.toggle_scope_in_out(camera),
             4 => self.clone_selected_prop(),

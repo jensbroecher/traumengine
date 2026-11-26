@@ -612,8 +612,8 @@
       <div class="nav-group-title">Creative Workflow</div>
       <a class="nav-link" href="#modes">The Four Modes</a>
       <a class="nav-link" href="#sculpting">Sculpting &amp; Painting</a>
-      <a class="nav-link" href="#flecks-palette">Living Flecks &amp; Palette</a>
-      <a class="nav-link" href="#toys-puppets">Toys, Cloning &amp; Puppets</a>
+      <a class="nav-link" href="#dabs-palette">Living Brush Dabs &amp; Palette</a>
+      <a class="nav-link" href="#toys-puppets">Toys, Linked Copies &amp; Puppets</a>
       <a class="nav-link" href="#animation">Animation &amp; Gadgets</a>
       <a class="nav-link" href="#play-mode">Instant Play Mode</a>
 
@@ -630,14 +630,14 @@
       <header class="hero" id="welcome">
         <div class="pill-row">
           <span class="pill accent">Rust + wgpu</span>
-          <span class="pill">SDF Clay + Painterly Flecks</span>
+          <span class="pill">SDF Clay + Painterly Brush Dabs</span>
           <span class="pill">Mouse/KB • Touch • Controller</span>
         </div>
         <h1>Traum Engine Manual</h1>
         <p>
-          <strong>Traum Engine</strong> is a playful, <em>Dreams</em>-inspired 3D Signed Distance Field (SDF) &amp;
-          Painterly Fleck creation engine. Sculpt warm tactile clay coated in living brushstrokes,
-          <strong>Scope In</strong> to build custom Toy Props, <strong>Live-Clone</strong> creations across your
+          <strong>Traum Engine</strong> is a playful 3D Signed Distance Field (SDF) &amp;
+          Painterly Brushstroke creation engine. Sculpt warm tactile clay coated in living brush dabs,
+          <strong>Edit Inside</strong> custom Toy Objects, make <strong>Linked Copies</strong> across your
           island, link multi-part puppets with spring and hinge joints, record animations live, and jump
           straight into <strong>Play Mode</strong> with zero load times.
         </p>
@@ -657,7 +657,7 @@ cargo test
 cargo run --bin traum-engine -- --self-test</code></pre>
         <div class="callout tip">
           <strong>Tip:</strong> Traum Engine never drops you into an empty grey grid. On launch, you land on a
-          sunlit <strong>Floating Diorama Island</strong> made of real editable SDF clay with example Toy Props
+          sunlit <strong>Floating Diorama Island</strong> made of real editable SDF clay with example Toy Objects
           already in place—your very first click can carve a cave, build a hill, or grab a toy.
         </div>
       </section>
@@ -667,10 +667,10 @@ cargo run --bin traum-engine -- --self-test</code></pre>
         <h2>Core Concepts</h2>
         <div class="grid">
           <div class="card">
-            <div class="card-title">World Clay vs. Toy Props</div>
+            <div class="card-title">World Clay vs. Toy Objects</div>
             <p>
               The island terrain lives in the <strong>World Canvas</strong> (<code>world_edits</code>). Movable,
-              reusable, animatable objects are <strong>Toy Props</strong> (<code>SceneProp</code>) backed by
+              reusable, animatable objects are <strong>Toy Objects</strong> (<code>SceneProp</code>) backed by
               shared <code>SculptAsset</code> edit lists.
             </p>
           </div>
@@ -682,17 +682,17 @@ cargo run --bin traum-engine -- --self-test</code></pre>
             </p>
           </div>
           <div class="card">
-            <div class="card-title">Surface-Magnet 3D Imp</div>
+            <div class="card-title">Surface-Magnet 3D Spark</div>
             <p>
-              Your 3D cursor—the <strong>Imp</strong>—glides along existing clay surfaces and projects a
+              Your 3D cursor—the <strong>Spark</strong>—glides along existing clay surfaces and projects a
               vertical ground drop-shadow guide when sculpting in open air so 3D depth is always clear.
             </p>
           </div>
           <div class="card">
-            <div class="card-title">Hybrid Clay + Living Flecks</div>
+            <div class="card-title">Hybrid Clay + Living Brush Dabs</div>
             <p>
-              Low looseness keeps a watertight SDF clay core free of pinholes; higher looseness billows
-              surface <strong>Flecks</strong> outward into painterly grass, clouds, embers, or 12fps stop-motion strokes.
+              Low fluffiness keeps a watertight SDF clay core free of pinholes; higher fluffiness billows
+              surface <strong>Brush Dabs</strong> outward into painterly grass, clouds, embers, or 12fps stop-motion strokes.
             </p>
           </div>
         </div>
@@ -705,15 +705,15 @@ cargo run --bin traum-engine -- --self-test</code></pre>
         <div class="grid">
           <div class="card">
             <div class="card-title"><span class="badge b-sculpt">1</span> Sculpt</div>
-            <p>Add or carve clay on the World Island or inside a Scoped-In Toy Prop using 6 primitive shapes and smooth CSG blending.</p>
+            <p>Add or carve clay on the World Island or inside a Toy Object using 6 primitive shapes and smooth CSG blending.</p>
           </div>
           <div class="card">
             <div class="card-title"><span class="badge b-paint">2</span> Paint</div>
-            <p>Re-coat existing clay with new colors, looseness, and Living Fleck styles without changing the sculpted shape.</p>
+            <p>Re-coat existing clay with new colors, fluffiness, and Living Brush Dab styles without changing the sculpted shape.</p>
           </div>
           <div class="card">
             <div class="card-title"><span class="badge b-anim">3</span> Animate</div>
-            <p>Select, move, rotate, scale, live-clone, attach jointed limbs, assign Motion Gadgets, and record live puppet performances.</p>
+            <p>Select, move, rotate, scale, make linked copies, attach jointed limbs, assign Motion Gadgets, and record live puppet performances.</p>
           </div>
           <div class="card">
             <div class="card-title"><span class="badge b-play">4 / Tab</span> Play!</div>
@@ -728,7 +728,7 @@ cargo run --bin traum-engine -- --self-test</code></pre>
         <h3>Brush Operations</h3>
         <ul>
           <li><strong>Add Clay</strong> (<code>SculptOp::Add</code>): Smoothly blends new clay onto surfaces or into open air.</li>
-          <li><strong>Carve</strong> (<code>SculptOp::Subtract</code>): Cuts tunnels, caves, windows, or dents out of clay. Quick-carve anytime with <kbd>Alt</kbd> + <kbd>Left Drag</kbd> (or <kbd>L2</kbd> + <kbd>R2</kbd> on controller).</li>
+          <li><strong>Carve Away</strong> (<code>SculptOp::Subtract</code>): Cuts tunnels, caves, windows, or dents out of clay. Quick-carve anytime with <kbd>Alt</kbd> + <kbd>Left Drag</kbd> (or <kbd>L2</kbd> + <kbd>R2</kbd> on controller).</li>
           <li><strong>Coat / Paint</strong> (<code>SculptOp::Paint</code>): Recolors and restyles existing surfaces without altering geometry.</li>
         </ul>
 
@@ -747,14 +747,14 @@ cargo run --bin traum-engine -- --self-test</code></pre>
         <ul>
           <li><strong>Brush Size:</strong> Drag the <em>Brush Size</em> slider, hold <kbd>Shift</kbd> + <kbd>Scroll</kbd>, press <kbd>[</kbd> / <kbd>]</kbd>, or pull <kbd>R2</kbd> analog trigger gently/deeply on controller.</li>
           <li><strong>Soft Clay Blend:</strong> Drag the <em>Soft Clay Blend</em> slider or hold <kbd>Ctrl</kbd> + <kbd>Scroll</kbd> to control how smoothly strokes melt together.</li>
-          <li><strong>Mirror Symmetry (<kbd>M</kbd>):</strong> Mirrors strokes across the X axis. When <strong>Scoped In</strong> to a Toy Prop, symmetry automatically uses the Toy's local X axis!</li>
+          <li><strong>Mirror Symmetry (<kbd>M</kbd>):</strong> Mirrors strokes across the X axis. When editing inside a Toy Object, symmetry automatically uses that Toy's local X axis!</li>
         </ul>
       </section>
 
-      <!-- LIVING FLECKS & PALETTE -->
-      <section id="flecks-palette">
-        <h2>Living Flecks &amp; Clay Color Palette</h2>
-        <h3>5 Living Fleck Styles (<kbd>G</kbd> to cycle)</h3>
+      <!-- LIVING BRUSH DABS & PALETTE -->
+      <section id="dabs-palette">
+        <h2>Living Brush Dabs &amp; Clay Color Palette</h2>
+        <h3>5 Living Brush Styles (<kbd>G</kbd> to cycle)</h3>
         <div class="table-wrap">
           <table>
             <thead>
@@ -799,29 +799,29 @@ cargo run --bin traum-engine -- --self-test</code></pre>
         <div class="palette-grid" id="paletteGrid"></div>
       </section>
 
-      <!-- TOYS, CLONING & PUPPETS -->
+      <!-- TOYS, LINKED COPIES & PUPPETS -->
       <section id="toys-puppets">
-        <h2>Toy Props, Scope In, Live Cloning &amp; Puppets</h2>
+        <h2>Toy Objects, Edit Inside, Linked Copies &amp; Puppets</h2>
 
-        <h3>Creating &amp; Scoping Into a Custom Toy</h3>
+        <h3>Creating &amp; Editing Inside a Custom Toy</h3>
         <ul>
-          <li>Press <kbd>P</kbd> (or click <strong>+ New Toy</strong>) to spawn a fresh editable Toy Prop.</li>
-          <li><strong>Scope In:</strong> Hover a Toy Prop and press <kbd>Enter</kbd> or <kbd>V</kbd> (or click <strong>Scope In</strong> / use the Outliner's <em>Edit Clay</em> button). While Scoped In, your brush edits that Toy's local 64³ SDF asset instead of the world island.</li>
-          <li><strong>Scope Out:</strong> Press <kbd>Enter</kbd>, <kbd>V</kbd>, or <kbd>Esc</kbd> to return to the island.</li>
+          <li>Press <kbd>P</kbd> (or click <strong>New Toy Object</strong>) to spawn a fresh editable Toy Object.</li>
+          <li><strong>Edit Inside Toy:</strong> Hover a Toy Object and press <kbd>Enter</kbd> or <kbd>V</kbd> (or click <strong>Edit Inside Toy</strong> / use the Outliner's <em>Clay</em> button). While editing inside, your brush shapes that Toy's local 64³ SDF asset instead of the world island.</li>
+          <li><strong>Exit Toy Edit:</strong> Press <kbd>Enter</kbd>, <kbd>V</kbd>, or <kbd>Esc</kbd> (or click the blue top banner) to return to the island.</li>
         </ul>
 
-        <h3>Live Clone vs. Make Unique</h3>
+        <h3>Linked Copy vs. Unlink Copy</h3>
         <ul>
-          <li><strong>Live Clone (<kbd>C</kbd> or <kbd>Ctrl+D</kbd>):</strong> Duplicates a Toy Prop while sharing its underlying <code>SculptAsset</code>. Sculpting or painting inside any clone updates <em>all</em> linked copies simultaneously!</li>
-          <li><strong>Make Unique (<kbd>U</kbd>):</strong> Forks a linked clone into its own independent <code>SculptAsset</code> so you can customize it without affecting its siblings.</li>
+          <li><strong>Copy Linked Toy (<kbd>C</kbd> or <kbd>Ctrl+D</kbd>):</strong> Duplicates a Toy Object while sharing its underlying <code>SculptAsset</code>. Sculpting or painting inside any copy updates <em>all</em> linked twins simultaneously!</li>
+          <li><strong>Unlink Copy (<kbd>U</kbd>):</strong> Forks a linked copy into its own independent <code>SculptAsset</code> so you can customize it without affecting its twins.</li>
         </ul>
 
         <h3>3D Transform Handles (Animate Mode <kbd>3</kbd>)</h3>
         <ul>
-          <li><strong>Drag Prop Body:</strong> Moves the Toy Prop in 3D space.</li>
-          <li><strong>Turquoise Ring:</strong> Drag to rotate the selected Toy Prop.</li>
-          <li><strong>Gold Orb:</strong> Drag to uniformly scale the selected Toy Prop (or use <kbd>[</kbd> / <kbd>]</kbd>).</li>
-          <li><strong>Delete Prop:</strong> Press <kbd>Delete</kbd> or <kbd>Backspace</kbd> to remove the selected Toy Prop.</li>
+          <li><strong>Drag Toy Body:</strong> Moves the Toy Object in 3D space.</li>
+          <li><strong>Turquoise Ring:</strong> Drag to rotate the selected Toy Object.</li>
+          <li><strong>Gold Orb:</strong> Drag to uniformly scale the selected Toy Object (or use <kbd>[</kbd> / <kbd>]</kbd>).</li>
+          <li><strong>Delete Toy:</strong> Press <kbd>Delete</kbd> or <kbd>Backspace</kbd> to remove the selected Toy Object.</li>
         </ul>
 
         <h3>Multi-Part Puppet Connectors (<kbd>L</kbd> or <code>+ Attach Limb</code>)</h3>
@@ -911,7 +911,7 @@ cargo run --bin traum-engine -- --self-test</code></pre>
               <text x="105" y="32">Add Clay</text>
               <text x="158" y="54">Carve</text>
               <text x="176" y="108">Paint</text>
-              <text x="154" y="160">Scope</text>
+              <text x="154" y="160">Edit Toy</text>
               <text x="105" y="184">Copy Toy</text>
               <text x="56" y="160">+ Limb</text>
               <text x="36" y="108">Symmetry</text>
@@ -924,8 +924,8 @@ cargo run --bin traum-engine -- --self-test</code></pre>
               <li><strong>Add Clay</strong> — Build smooth clay onto surfaces</li>
               <li><strong>Carve</strong> — Cut tunnels, caves, or dents</li>
               <li><strong>Paint</strong> — Color &amp; restyle without changing shape</li>
-              <li><strong>Scope In / Out</strong> — Edit inside a Toy Prop</li>
-              <li><strong>Copy Toy</strong> — Live-Clone linked copies</li>
+              <li><strong>Edit Toy / Exit</strong> — Sculpt inside a Toy Object</li>
+              <li><strong>Copy Toy</strong> — Duplicate linked copies</li>
               <li><strong>+ Limb</strong> — Attach a jointed child part</li>
               <li><strong>Symmetry</strong> — Toggle Mirror X sculpting</li>
               <li><strong>Play!</strong> — Jump into Play Mode</li>
@@ -935,8 +935,8 @@ cargo run --bin traum-engine -- --self-test</code></pre>
 
         <h3>Tactile Sliders &amp; Scene Objects Outliner</h3>
         <ul>
-          <li><strong>Sliders:</strong> <em>Brush Size</em>, <em>Soft Clay Blend</em>, <em>Painterly Fluffiness (Looseness)</em>, and <em>Miniature Camera Blur (Bokeh DOF)</em>.</li>
-          <li><strong>Scene Objects Outliner:</strong> Located on the right side of the viewport. Shows the <em>World Canvas</em> plus a hierarchical parent/child tree of all Toy Props, with quick buttons to focus, <strong>Move</strong>, or <strong>Edit Clay</strong> (Scope In), plus pagination for large scenes.</li>
+          <li><strong>Sliders:</strong> <em>Brush Size</em>, <em>Soft Clay Blend</em>, <em>Fluffiness</em>, and <em>Focus Blur</em>.</li>
+          <li><strong>Scene Objects Outliner:</strong> Located on the right side of the viewport. Shows the <em>World Island</em> plus a hierarchical parent/child tree of all Toy Objects, with quick buttons to focus, <strong>Move</strong>, <strong>Clay</strong> (Edit Inside), or <strong>Del</strong>, plus pagination for large scenes.</li>
         </ul>
       </section>
 
@@ -969,16 +969,16 @@ cargo run --bin traum-engine -- --self-test</code></pre>
               <thead><tr><th>Action</th><th>Control</th></tr></thead>
               <tbody>
                 <tr><td>Sculpt / Paint / Grab Toy</td><td><kbd>Left Click + Drag</kbd> (<kbd>Alt + Left Drag</kbd> quick-carves)</td></tr>
-                <tr><td>Scope In / Out (Custom Toy)</td><td>Hover Toy + <kbd>Enter</kbd> or <kbd>V</kbd> • <kbd>Enter</kbd> / <kbd>Esc</kbd> Scope Out</td></tr>
-                <tr><td>Live Clone &amp; Make Unique</td><td><kbd>C</kbd> or <kbd>Ctrl+D</kbd> Live Clone • <kbd>U</kbd> Make Unique</td></tr>
-                <tr><td>Multi-Part Puppet Limbs</td><td><kbd>L</kbd> or <code>+ Attach Limb</code> pill</td></tr>
+                <tr><td>Edit Inside Toy / Exit</td><td>Hover Toy + <kbd>Enter</kbd> or <kbd>V</kbd> • <kbd>Enter</kbd> / <kbd>Esc</kbd> Exit</td></tr>
+                <tr><td>Linked Copy &amp; Unlink Copy</td><td><kbd>C</kbd> or <kbd>Ctrl+D</kbd> Linked Copy • <kbd>U</kbd> Unlink Copy</td></tr>
+                <tr><td>Multi-Part Puppet Limbs</td><td><kbd>L</kbd> or <code>Attach Limb</code> button</td></tr>
                 <tr><td>3D Rotate &amp; Scale Handles</td><td>In Animate mode (<kbd>3</kbd>): drag <strong>Turquoise Ring</strong> (Rotate) or <strong>Gold Orb</strong> (Scale)</td></tr>
                 <tr><td>Orbit / Pan / Zoom Camera</td><td><kbd>Right-Drag</kbd> Orbit • <kbd>Middle-Drag</kbd> or <kbd>Shift+Right-Drag</kbd> Pan • <kbd>Scroll</kbd> Zoom • <kbd>WASD</kbd>/<kbd>Q</kbd>/<kbd>E</kbd></td></tr>
                 <tr><td>Bouncy Radial Pie Wheel</td><td>Hold <kbd>Space</kbd> → flick mouse → release</td></tr>
                 <tr><td>Brush Size &amp; Smooth Blend</td><td><kbd>Shift+Scroll</kbd> or <kbd>[</kbd> / <kbd>]</kbd> Size/Scale • <kbd>Ctrl+Scroll</kbd> Smooth Blend</td></tr>
                 <tr><td>Modes</td><td><kbd>1</kbd> Sculpt • <kbd>2</kbd> Paint • <kbd>3</kbd> Animate • <kbd>4</kbd> or <kbd>Tab</kbd> Play!</td></tr>
-                <tr><td>Shapes / Flecks / Symmetry</td><td><kbd>F</kbd> Next Shape • <kbd>G</kbd> Next Fleck Style • <kbd>M</kbd> Mirror X</td></tr>
-                <tr><td>New Toy &amp; Action Recorder</td><td><kbd>P</kbd> New Custom Toy • <kbd>R</kbd> Arm Action Recorder → drag prop to record</td></tr>
+                <tr><td>Shapes / Brush Styles / Symmetry</td><td><kbd>F</kbd> Next Shape • <kbd>G</kbd> Next Brush Style • <kbd>M</kbd> Mirror X</td></tr>
+                <tr><td>New Toy &amp; Action Recorder</td><td><kbd>P</kbd> New Toy Object • <kbd>R</kbd> Arm Action Recorder → drag Toy to record</td></tr>
                 <tr><td>Undo / Redo / Delete</td><td><kbd>Ctrl+Z</kbd> / <kbd>Z</kbd> Undo • <kbd>Ctrl+Y</kbd> Redo • <kbd>Delete</kbd> / <kbd>Backspace</kbd> Remove Toy</td></tr>
                 <tr><td>Save / Load</td><td><kbd>Ctrl+S</kbd> / <kbd>F5</kbd> Save (<code>island_dream.ron</code>) • <kbd>F9</kbd> Load</td></tr>
                 <tr><td>Play Mode</td><td><kbd>WASD</kbd> / Arrows Walk • <kbd>Space</kbd> Jump • <kbd>Right-Drag</kbd> Camera • <kbd>Tab</kbd> / <kbd>Esc</kbd> Sculpt</td></tr>
@@ -993,10 +993,10 @@ cargo run --bin traum-engine -- --self-test</code></pre>
               <thead><tr><th>Action</th><th>Gesture</th></tr></thead>
               <tbody>
                 <tr><td>Sculpt / Paint / Drag 3D Handles</td><td><strong>1-Finger Drag / Tap</strong></td></tr>
-                <tr><td>Scope In / Clone / Attach Limb</td><td>Tap <code>Scope In</code>, <code>Live Clone</code>, or <code>+ Attach Limb</code> pills (or Radial Wheel)</td></tr>
+                <tr><td>Edit Inside / Copy / Attach Limb</td><td>Tap <code>Edit Inside Toy</code>, <code>Copy Linked Toy</code>, or <code>Attach Limb</code> buttons (or Radial Wheel)</td></tr>
                 <tr><td>Orbit &amp; Pinch-Zoom Camera</td><td><strong>2-Finger Drag</strong> (Orbit) + <strong>2-Finger Pinch</strong> (Zoom)</td></tr>
                 <tr><td>Quick Undo / Redo</td><td><strong>2-Finger Tap</strong> (Undo) • <strong>3-Finger Tap</strong> (Redo)</td></tr>
-                <tr><td>Radial Pie Menu</td><td>Tap top <code>Wheel</code> button → tap any slice</td></tr>
+                <tr><td>Radial Pie Menu</td><td>Tap top <code>Menu</code> button → tap any slice</td></tr>
                 <tr><td>Play Mode</td><td>Left screen side = Virtual Analog Stick • Bottom-right tap = Jump • Right drag = Orbit</td></tr>
               </tbody>
             </table>
@@ -1008,11 +1008,11 @@ cargo run --bin traum-engine -- --self-test</code></pre>
             <table class="ctrl-table">
               <thead><tr><th>Action</th><th>Control (Xbox / DualSense / Switch Pro)</th></tr></thead>
               <tbody>
-                <tr><td>3D Imp &amp; Camera</td><td><kbd>Right Stick</kbd> moves 3D Imp • <kbd>Left Stick</kbd> orbits diorama</td></tr>
+                <tr><td>3D Spark &amp; Camera</td><td><kbd>Right Stick</kbd> moves 3D Spark • <kbd>Left Stick</kbd> orbits diorama</td></tr>
                 <tr><td>Analog Sculpt / Carve</td><td><kbd>R2</kbd> Analog Trigger (pull depth controls brush size) • <kbd>L2 + R2</kbd> Carve</td></tr>
-                <tr><td>Scope In / Out &amp; Live Clone</td><td><kbd>R1 / RB</kbd> Scope In / Out • <kbd>Select</kbd> Live-Clone Toy</td></tr>
+                <tr><td>Edit Inside &amp; Linked Copy</td><td><kbd>R1 / RB</kbd> Enter / Exit Toy • <kbd>Select</kbd> Linked Copy</td></tr>
                 <tr><td>Radial Pie Wheel</td><td>Hold <kbd>L1 / LB</kbd> + flick <kbd>Right Stick</kbd> → release <kbd>L1</kbd></td></tr>
-                <tr><td>Quick Cycle &amp; Undo</td><td><kbd>Y / Triangle</kbd> Shape • <kbd>B / Circle</kbd> Fleck • <kbd>X / Square</kbd> Mirror • <kbd>D-Pad Left/Right</kbd> Undo/Redo • <kbd>D-Pad Up/Down</kbd> Size</td></tr>
+                <tr><td>Quick Cycle &amp; Undo</td><td><kbd>Y / Triangle</kbd> Shape • <kbd>B / Circle</kbd> Brush Style • <kbd>X / Square</kbd> Mirror • <kbd>D-Pad Left/Right</kbd> Undo/Redo • <kbd>D-Pad Up/Down</kbd> Size</td></tr>
                 <tr><td>Toggle Play Mode</td><td><kbd>Start</kbd> (<kbd>Left Stick</kbd> Walk • <kbd>Right Stick</kbd> Camera • <kbd>A / Cross</kbd> Jump)</td></tr>
               </tbody>
             </table>
@@ -1029,9 +1029,9 @@ cargo run --bin traum-engine -- --self-test</code></pre>
           <span class="pipe-arrow">→</span>
           <div class="pipe-step">Sparse 8×8×8 SDF Bricks</div>
           <span class="pipe-arrow">→</span>
-          <div class="pipe-step">Iso-Surface Fleck Extractor</div>
+          <div class="pipe-step">Surface Dab Extractor</div>
           <span class="pipe-arrow">→</span>
-          <div class="pipe-step">Instanced Fleck Splatting + SDF AO</div>
+          <div class="pipe-step">Instanced Dab Splatting + SDF AO</div>
           <span class="pipe-arrow">→</span>
           <div class="pipe-step">Bokeh DOF + Toy UI</div>
         </div>
@@ -1042,11 +1042,11 @@ cargo run --bin traum-engine -- --self-test</code></pre>
               <tr><th>Crate</th><th>Responsibility</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>traum-core</code></td><td>Primitive shapes, Fleck styles, Motion Gadgets, Connectors, CSG Edit Lists, Scene &amp; RON serialization.</td></tr>
-              <tr><td><code>traum-input</code></td><td>Unified Imp input hub across Mouse/KB, Multi-Touch (<code>winit</code>), and Gamepad (<code>gilrs</code>) + spring-damped Camera Rig.</td></tr>
+              <tr><td><code>traum-core</code></td><td>Primitive shapes, Living Brush styles, Motion Gadgets, Connectors, CSG Edit Lists, Scene &amp; RON serialization.</td></tr>
+              <tr><td><code>traum-input</code></td><td>Unified Spark input hub across Mouse/KB, Multi-Touch (<code>winit</code>), and Gamepad (<code>gilrs</code>) + spring-damped Camera Rig.</td></tr>
               <tr><td><code>traum-sdf</code></td><td>CPU/GPU-mirrored SDF math, dirty brick &amp; asset trackers, scene raycasting, and sphere collision resolution.</td></tr>
-              <tr><td><code>traum-render</code></td><td><code>wgpu</code> pipelines, WGSL compute shaders, fleck splatting, bokeh post-processing, 2D Toy UI, and headless <code>--self-test</code>.</td></tr>
-              <tr><td><code>traum-editor</code></td><td>Stateful editor tools, Scope-In, Live-Clone, 3D handles, Action Recorder, Radial Pie UI, Outliner, and Play Mode puppet.</td></tr>
+              <tr><td><code>traum-render</code></td><td><code>wgpu</code> pipelines, WGSL compute shaders, brush dab splatting, bokeh post-processing, 2D Toy UI, and headless <code>--self-test</code>.</td></tr>
+              <tr><td><code>traum-editor</code></td><td>Stateful editor tools, Solo Toy Editing, Linked Copies, 3D handles, Action Recorder, Radial Pie UI, Outliner, and Play Mode character.</td></tr>
               <tr><td><code>traum-app</code></td><td>Windowed <code>winit 0.30</code> event loop, frame timing, and CLI <code>--self-test</code> entrypoint.</td></tr>
             </tbody>
           </table>
