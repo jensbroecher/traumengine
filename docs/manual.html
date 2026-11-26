@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Traum Engine — User Manual</title>
+  <style>
+    :root {
+      --bg: #151720;
+      --bg-elevated: #1e2130;
+      --bg-card: #24283a;
+      --bg-soft: #2c3147;
+      --border: rgba(255, 255, 255, 0.1);
+      --border-strong: rgba(255, 255, 255, 0.18);
+      --text: #f3efe6;
+      --text-muted: #b8b5ad;
+      --text-dim: #8a8882;
+
+      /* Traum Engine Clay Palette */
+      --terracotta: #e07552;
+      --ochre: #f0c266;
+      --moss: #6bb861;
+      --teal: #3d8f75;
+      --sky: #61a3e0;
+      --lavender: #9e75d6;
+      --coral: #e67094;
+      --amber: #ffad38;
+
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      --sidebar-w: 280px;
+      --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: "JetBrains Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1200px 600px at 85% -10%, rgba(224, 117, 82, 0.14), transparent 60%),
+        radial-gradient(900px 500px at 10% 10%, rgba(97, 163, 224, 0.11), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a {
+      color: var(--sky);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.88em;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0.14em 0.42em;
+      border-radius: 6px;
+      color: var(--ochre);
+    }
+
+    pre {
+      background: #101219;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: #eae6dc;
+    }
+
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    kbd {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.8em;
+      font-weight: 600;
+      line-height: 1.2;
+      padding: 0.22em 0.52em;
+      border-radius: 7px;
+      background: linear-gradient(180deg, #32374f, #23273a);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    /* Layout */
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: var(--sidebar-w);
+      background: rgba(21, 23, 32, 0.92);
+      backdrop-filter: blur(14px);
+      border-right: 1px solid var(--border);
+      padding: 1.4rem 1.1rem;
+      overflow-y: auto;
+      z-index: 40;
+      transition: transform 0.25s ease;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.35rem 0.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 1rem;
+    }
+
+    .brand-orb {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      background: radial-gradient(circle at 30% 30%, var(--ochre), var(--terracotta) 65%, #9e3d28);
+      box-shadow: 0 6px 16px rgba(224, 117, 82, 0.38);
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-weight: 800;
+      font-size: 1.08rem;
+      letter-spacing: -0.01em;
+      line-height: 1.15;
+    }
+
+    .brand-sub {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .nav-group-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-dim);
+      margin: 1.1rem 0.6rem 0.4rem;
+    }
+
+    .nav-link {
+      display: block;
+      padding: 0.42rem 0.7rem;
+      border-radius: 9px;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      font-weight: 500;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .nav-link:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .nav-link.active {
+      background: rgba(224, 117, 82, 0.18);
+      color: var(--ochre);
+      font-weight: 600;
+    }
+
+    .mobile-bar {
+      display: none;
+      position: sticky;
+      top: 0;
+      z-index: 35;
+      background: rgba(21, 23, 32, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0.7rem 1rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .menu-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+      padding: 0.4rem 0.8rem;
+      border-radius: 9px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      max-width: 1020px;
+      padding: 2.5rem 2.75rem 5rem;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, rgba(224, 117, 82, 0.16), rgba(97, 163, 224, 0.12) 60%, rgba(158, 117, 214, 0.14));
+      border: 1px solid var(--border-strong);
+      border-radius: 22px;
+      padding: 2.2rem 2.2rem 2rem;
+      box-shadow: var(--shadow);
+      margin-bottom: 2.4rem;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 0.28rem 0.72rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--text);
+    }
+
+    .pill.accent {
+      background: rgba(224, 117, 82, 0.22);
+      border-color: rgba(224, 117, 82, 0.45);
+      color: var(--ochre);
+    }
+
+    h1 {
+      font-size: clamp(1.9rem, 3.2vw, 2.65rem);
+      line-height: 1.15;
+      margin: 0 0 0.75rem;
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      max-width: 72ch;
+    }
+
+    section {
+      margin-bottom: 3rem;
+      scroll-margin-top: 1.5rem;
+    }
+
+    h2 {
+      font-size: 1.55rem;
+      letter-spacing: -0.015em;
+      margin: 0 0 0.8rem;
+      padding-bottom: 0.45rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    h3 {
+      font-size: 1.12rem;
+      margin: 1.4rem 0 0.5rem;
+      color: var(--ochre);
+    }
+
+    p {
+      margin: 0 0 0.85rem;
+      color: var(--text-muted);
+    }
+
+    ul, ol {
+      margin: 0 0 1rem;
+      padding-left: 1.3rem;
+      color: var(--text-muted);
+    }
+
+    li {
+      margin-bottom: 0.35rem;
+    }
+
+    strong {
+      color: var(--text);
+    }
+
+    /* Cards & Grids */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0 1.2rem;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.2rem;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text);
+    }
+
+    .card p {
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .b-sculpt { background: rgba(224, 117, 82, 0.22); color: #ff9c7a; }
+    .b-paint { background: rgba(230, 112, 148, 0.22); color: #ff9ab8; }
+    .b-anim { background: rgba(158, 117, 214, 0.22); color: #c7a7f7; }
+    .b-play { background: rgba(107, 184, 97, 0.22); color: #96e38c; }
+    .b-sky { background: rgba(97, 163, 224, 0.22); color: #8fc7ff; }
+
+    /* Callouts */
+    .callout {
+      border-left: 4px solid var(--ochre);
+      background: rgba(240, 194, 102, 0.09);
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      padding: 0.9rem 1.1rem;
+      margin: 1rem 0;
+      font-size: 0.93rem;
+      color: var(--text-muted);
+    }
+
+    .callout.tip {
+      border-left-color: var(--moss);
+      background: rgba(107, 184, 97, 0.09);
+    }
+
+    .callout.info {
+      border-left-color: var(--sky);
+      background: rgba(97, 163, 224, 0.09);
+    }
+
+    /* Tables */
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-elevated);
+      margin: 1rem 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.91rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 0.72rem 0.95rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-weight: 700;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Palette Swatches */
+    .palette-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    .swatch-card {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.6rem 0.75rem;
+    }
+
+    .swatch-dot {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      flex-shrink: 0;
+      box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    .swatch-name {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .swatch-hex {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    /* Tabs & Search */
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .tab-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.52rem 1rem;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .tab-btn:hover {
+      border-color: var(--border-strong);
+      color: var(--text);
+    }
+
+    .tab-btn.active {
+      background: var(--terracotta);
+      border-color: var(--terracotta);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(224, 117, 82, 0.35);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 0.65rem 0.95rem;
+      border-radius: 11px;
+      border: 1px solid var(--border-strong);
+      background: var(--bg-elevated);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 0.92rem;
+      margin-bottom: 0.9rem;
+      outline: none;
+    }
+
+    .search-box:focus {
+      border-color: var(--sky);
+      box-shadow: 0 0 0 3px rgba(97, 163, 224, 0.2);
+    }
+
+    /* Radial Wheel Diagram */
+    .wheel-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1.8rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.4rem;
+      margin: 1rem 0;
+    }
+
+    .pipeline {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+
+    .pipe-step {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      padding: 0.65rem 0.9rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .pipe-arrow {
+      color: var(--ochre);
+      font-weight: 800;
+    }
+
+    @media (max-width: 920px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .mobile-bar {
+        display: flex;
+      }
+      .main {
+        margin-left: 0;
+        padding: 1.5rem 1.2rem 4rem;
+      }
+    }
+
+    @media print {
+      .sidebar, .mobile-bar, .search-box {
+        display: none !important;
+      }
+      .main {
+        margin-left: 0;
+        max-width: 100%;
+        padding: 0;
+      }
+      body {
+        background: #fff;
+        color: #111;
+      }
+      .card, .table-wrap, pre {
+        background: #f8f8f8;
+        color: #111;
+        border-color: #ccc;
+      }
+      p, li, td {
+        color: #222;
+      }
+      .tab-panel {
+        display: block !important;
+        margin-bottom: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="mobile-bar">
+    <strong>Traum Engine Manual</strong>
+    <button class="menu-btn" id="menuToggle" type="button">Menu</button>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-orb" aria-hidden="true"></div>
+        <div>
+          <div class="brand-title">Traum Engine</div>
+          <div class="brand-sub">v0.1.0 • User Manual</div>
+        </div>
+      </div>
+
+      <div class="nav-group-title">Getting Started</div>
+      <a class="nav-link active" href="#welcome">Welcome &amp; Quick Start</a>
+      <a class="nav-link" href="#concepts">Core Concepts</a>
+
+      <div class="nav-group-title">Creative Workflow</div>
+      <a class="nav-link" href="#modes">The Four Modes</a>
+      <a class="nav-link" href="#sculpting">Sculpting &amp; Painting</a>
+      <a class="nav-link" href="#flecks-palette">Living Flecks &amp; Palette</a>
+      <a class="nav-link" href="#toys-puppets">Toys, Cloning &amp; Puppets</a>
+      <a class="nav-link" href="#animation">Animation &amp; Gadgets</a>
+      <a class="nav-link" href="#play-mode">Instant Play Mode</a>
+
+      <div class="nav-group-title">Interface &amp; Controls</div>
+      <a class="nav-link" href="#ui-tools">Toy UI, Radial Wheel &amp; Outliner</a>
+      <a class="nav-link" href="#save-load">Saving, Loading &amp; Undo</a>
+      <a class="nav-link" href="#controls">Controls Across Devices</a>
+
+      <div class="nav-group-title">Under the Hood</div>
+      <a class="nav-link" href="#architecture">Pipeline &amp; Crate Map</a>
+    </aside>
+
+    <main class="main">
+      <header class="hero" id="welcome">
+        <div class="pill-row">
+          <span class="pill accent">Rust + wgpu</span>
+          <span class="pill">SDF Clay + Painterly Flecks</span>
+          <span class="pill">Mouse/KB • Touch • Controller</span>
+        </div>
+        <h1>Traum Engine Manual</h1>
+        <p>
+          <strong>Traum Engine</strong> is a playful, <em>Dreams</em>-inspired 3D Signed Distance Field (SDF) &amp;
+          Painterly Fleck creation engine. Sculpt warm tactile clay coated in living brushstrokes,
+          <strong>Scope In</strong> to build custom Toy Props, <strong>Live-Clone</strong> creations across your
+          island, link multi-part puppets with spring and hinge joints, record animations live, and jump
+          straight into <strong>Play Mode</strong> with zero load times.
+        </p>
+      </header>
+
+      <!-- QUICK START -->
+      <section>
+        <h2>Quick Start</h2>
+        <p>Run Traum Engine from the workspace root using Cargo:</p>
+        <pre><code># Launch Traum Engine (opens directly onto the editable Floating Diorama Island)
+cargo run --bin traum-engine
+
+# Run all CPU unit tests across workspace crates
+cargo test
+
+# Run the headless GPU compute + render verification self-test
+cargo run --bin traum-engine -- --self-test</code></pre>
+        <div class="callout tip">
+          <strong>Tip:</strong> Traum Engine never drops you into an empty grey grid. On launch, you land on a
+          sunlit <strong>Floating Diorama Island</strong> made of real editable SDF clay with example Toy Props
+          already in place—your very first click can carve a cave, build a hill, or grab a toy.
+        </div>
+      </section>
+
+      <!-- CORE CONCEPTS -->
+      <section id="concepts">
+        <h2>Core Concepts</h2>
+        <div class="grid">
+          <div class="card">
+            <div class="card-title">World Clay vs. Toy Props</div>
+            <p>
+              The island terrain lives in the <strong>World Canvas</strong> (<code>world_edits</code>). Movable,
+              reusable, animatable objects are <strong>Toy Props</strong> (<code>SceneProp</code>) backed by
+              shared <code>SculptAsset</code> edit lists.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-title">Non-Destructive CSG Edits</div>
+            <p>
+              Every brushstroke is stored as an ordered <code>SculptEdit</code> (Add, Carve, or Paint) rather
+              than baked triangles—giving you clean undo/redo and compact <code>.ron</code> scene files.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-title">Surface-Magnet 3D Imp</div>
+            <p>
+              Your 3D cursor—the <strong>Imp</strong>—glides along existing clay surfaces and projects a
+              vertical ground drop-shadow guide when sculpting in open air so 3D depth is always clear.
+            </p>
+          </div>
+          <div class="card">
+            <div class="card-title">Hybrid Clay + Living Flecks</div>
+            <p>
+              Low looseness keeps a watertight SDF clay core free of pinholes; higher looseness billows
+              surface <strong>Flecks</strong> outward into painterly grass, clouds, embers, or 12fps stop-motion strokes.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- THE FOUR MODES -->
+      <section id="modes">
+        <h2>The Four Creative Modes</h2>
+        <p>Switch modes anytime using the top mode pills, the Radial Pie Wheel, or number keys <kbd>1</kbd>–<kbd>4</kbd>:</p>
+        <div class="grid">
+          <div class="card">
+            <div class="card-title"><span class="badge b-sculpt">1</span> Sculpt</div>
+            <p>Add or carve clay on the World Island or inside a Scoped-In Toy Prop using 6 primitive shapes and smooth CSG blending.</p>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="badge b-paint">2</span> Paint</div>
+            <p>Re-coat existing clay with new colors, looseness, and Living Fleck styles without changing the sculpted shape.</p>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="badge b-anim">3</span> Animate</div>
+            <p>Select, move, rotate, scale, live-clone, attach jointed limbs, assign Motion Gadgets, and record live puppet performances.</p>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="badge b-play">4 / Tab</span> Play!</div>
+            <p>Drop directly onto the island as a bouncy playable character. Walk, jump, ride moving platforms, and explore your creation.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- SCULPTING & PAINTING -->
+      <section id="sculpting">
+        <h2>Sculpting &amp; Painting</h2>
+        <h3>Brush Operations</h3>
+        <ul>
+          <li><strong>Add Clay</strong> (<code>SculptOp::Add</code>): Smoothly blends new clay onto surfaces or into open air.</li>
+          <li><strong>Carve</strong> (<code>SculptOp::Subtract</code>): Cuts tunnels, caves, windows, or dents out of clay. Quick-carve anytime with <kbd>Alt</kbd> + <kbd>Left Drag</kbd> (or <kbd>L2</kbd> + <kbd>R2</kbd> on controller).</li>
+          <li><strong>Coat / Paint</strong> (<code>SculptOp::Paint</code>): Recolors and restyles existing surfaces without altering geometry.</li>
+        </ul>
+
+        <h3>6 Primitive Shapes</h3>
+        <p>Cycle shapes with <kbd>F</kbd>, the Shape pill, or <kbd>Y</kbd>/<kbd>Triangle</kbd> on a controller:</p>
+        <div class="pill-row">
+          <span class="pill">Sphere</span>
+          <span class="pill">Soft Box (RoundedBox)</span>
+          <span class="pill">Capsule</span>
+          <span class="pill">Cylinder</span>
+          <span class="pill">Cone</span>
+          <span class="pill">Ring (Torus)</span>
+        </div>
+
+        <h3>Brush Controls &amp; Symmetry</h3>
+        <ul>
+          <li><strong>Brush Size:</strong> Drag the <em>Brush Size</em> slider, hold <kbd>Shift</kbd> + <kbd>Scroll</kbd>, press <kbd>[</kbd> / <kbd>]</kbd>, or pull <kbd>R2</kbd> analog trigger gently/deeply on controller.</li>
+          <li><strong>Soft Clay Blend:</strong> Drag the <em>Soft Clay Blend</em> slider or hold <kbd>Ctrl</kbd> + <kbd>Scroll</kbd> to control how smoothly strokes melt together.</li>
+          <li><strong>Mirror Symmetry (<kbd>M</kbd>):</strong> Mirrors strokes across the X axis. When <strong>Scoped In</strong> to a Toy Prop, symmetry automatically uses the Toy's local X axis!</li>
+        </ul>
+      </section>
+
+      <!-- LIVING FLECKS & PALETTE -->
+      <section id="flecks-palette">
+        <h2>Living Flecks &amp; Clay Color Palette</h2>
+        <h3>5 Living Fleck Styles (<kbd>G</kbd> to cycle)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Style</th>
+                <th>Visual &amp; Motion Behavior</th>
+                <th>Great For</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Impasto</strong> (<code>ClayImpasto</code>)</td>
+                <td>Tactile painterly brushstrokes hugging the clay surface.</td>
+                <td>Terrain, rocks, characters, architectural props</td>
+              </tr>
+              <tr>
+                <td><strong>Breeze Leaf</strong> (<code>FoliageBreeze</code>)</td>
+                <td>Leafy strokes that sway gently in a shader-driven warm breeze.</td>
+                <td>Trees, bushes, grass tufts, hanging vines</td>
+              </tr>
+              <tr>
+                <td><strong>12fps Boil</strong> (<code>SketchBoil</code>)</td>
+                <td>Hand-drawn / stop-motion strokes that subtly dance at 12fps.</td>
+                <td>Stylized critters, sketchy props, animated illustrations</td>
+              </tr>
+              <tr>
+                <td><strong>Cloud Puff</strong> (<code>FluffyCloud</code>)</td>
+                <td>Fluffy, billowing strokes that softly drift and churn.</td>
+                <td>Clouds, smoke, fur, cotton, waterfalls</td>
+              </tr>
+              <tr>
+                <td><strong>Glow Ember</strong> (<code>GlowEmber</code>)</td>
+                <td>Warm self-illuminated strokes with emissive glow.</td>
+                <td>Lanterns, campfires, magic crystals, eyes</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>12 Curated Clay Colors</h3>
+        <p>Select any swatch from the bottom Color Tray:</p>
+        <div class="palette-grid" id="paletteGrid"></div>
+      </section>
+
+      <!-- TOYS, CLONING & PUPPETS -->
+      <section id="toys-puppets">
+        <h2>Toy Props, Scope In, Live Cloning &amp; Puppets</h2>
+
+        <h3>Creating &amp; Scoping Into a Custom Toy</h3>
+        <ul>
+          <li>Press <kbd>P</kbd> (or click <strong>+ New Toy</strong>) to spawn a fresh editable Toy Prop.</li>
+          <li><strong>Scope In:</strong> Hover a Toy Prop and press <kbd>Enter</kbd> or <kbd>V</kbd> (or click <strong>Scope In</strong> / use the Outliner's <em>Edit Clay</em> button). While Scoped In, your brush edits that Toy's local 64³ SDF asset instead of the world island.</li>
+          <li><strong>Scope Out:</strong> Press <kbd>Enter</kbd>, <kbd>V</kbd>, or <kbd>Esc</kbd> to return to the island.</li>
+        </ul>
+
+        <h3>Live Clone vs. Make Unique</h3>
+        <ul>
+          <li><strong>Live Clone (<kbd>C</kbd> or <kbd>Ctrl+D</kbd>):</strong> Duplicates a Toy Prop while sharing its underlying <code>SculptAsset</code>. Sculpting or painting inside any clone updates <em>all</em> linked copies simultaneously!</li>
+          <li><strong>Make Unique (<kbd>U</kbd>):</strong> Forks a linked clone into its own independent <code>SculptAsset</code> so you can customize it without affecting its siblings.</li>
+        </ul>
+
+        <h3>3D Transform Handles (Animate Mode <kbd>3</kbd>)</h3>
+        <ul>
+          <li><strong>Drag Prop Body:</strong> Moves the Toy Prop in 3D space.</li>
+          <li><strong>Turquoise Ring:</strong> Drag to rotate the selected Toy Prop.</li>
+          <li><strong>Gold Orb:</strong> Drag to uniformly scale the selected Toy Prop (or use <kbd>[</kbd> / <kbd>]</kbd>).</li>
+          <li><strong>Delete Prop:</strong> Press <kbd>Delete</kbd> or <kbd>Backspace</kbd> to remove the selected Toy Prop.</li>
+        </ul>
+
+        <h3>Multi-Part Puppet Connectors (<kbd>L</kbd> or <code>+ Attach Limb</code>)</h3>
+        <p>Attach child limbs to any selected Toy Prop to build articulated puppets and contraptions. Cycle connector behavior with the connector pill:</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Connector</th>
+                <th>Behavior</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Spring Ball</strong> (<code>BallSpring</code>)</td>
+                <td>Bouncy secondary-motion ball joint that wobbles and lags organically behind parent movement.</td>
+              </tr>
+              <tr>
+                <td><strong>Spin Hinge</strong> (<code>HingeSpin</code>)</td>
+                <td>Continuous spinning hinge around local Y—ideal for windmills, propellers, and spinning hats.</td>
+              </tr>
+              <tr>
+                <td><strong>Swing Hinge</strong> (<code>HingeSwing</code>)</td>
+                <td>Rhythmic swinging hinge around local Z—ideal for wings, arms, tails, and hanging lanterns.</td>
+              </tr>
+              <tr>
+                <td><strong>Rigid Weld</strong> (<code>Rigid</code>)</td>
+                <td>Welded attachment that follows the parent's pose 1:1.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ANIMATION & GADGETS -->
+      <section id="animation">
+        <h2>Animation &amp; Motion Gadgets</h2>
+        <h3>Zero-Keyframe Motion Gadgets</h3>
+        <p>Cycle a procedural Motion Gadget on any selected Toy Prop for instant life without recording keyframes:</p>
+        <div class="pill-row">
+          <span class="pill">Still (None)</span>
+          <span class="pill">Hover (HoverBob)</span>
+          <span class="pill">Spin</span>
+          <span class="pill">Hop (BouncyHop)</span>
+          <span class="pill">Swing (Pendulum)</span>
+        </div>
+
+        <h3>Live Action Recorder (<kbd>R</kbd>)</h3>
+        <ol>
+          <li>Select a Toy Prop in <strong>Animate</strong> mode (<kbd>3</kbd>).</li>
+          <li>Press <kbd>R</kbd> (or click <strong>Record</strong>) to arm the Action Recorder.</li>
+          <li>Grab and move/wiggle the Toy Prop live—Traum Engine records your <code>ActionClip</code> keyframes and loops your performance automatically.</li>
+          <li>Use <strong>Clear Clip</strong> to remove a recorded loop if you want to re-record.</li>
+        </ol>
+      </section>
+
+      <!-- PLAY MODE -->
+      <section id="play-mode">
+        <h2>Instant Play Mode</h2>
+        <p>
+          Press <kbd>4</kbd>, <kbd>Tab</kbd>, or <kbd>Start</kbd> (controller) at any moment to drop onto your
+          island with the playable bouncy character buddy.
+        </p>
+        <ul>
+          <li><strong>Zero Load Time:</strong> Collisions are resolved directly against the live SDF world and Toy Props.</li>
+          <li><strong>Moving Platforms:</strong> Stand on animated or Gadget-driven Toy Props and ride along with them.</li>
+          <li><strong>Forgiving Feel:</strong> Includes coyote-time jumping and squash-and-stretch feedback.</li>
+          <li><strong>Return to Editor:</strong> Press <kbd>Tab</kbd> or <kbd>Esc</kbd> to snap right back into Sculpt mode.</li>
+        </ul>
+      </section>
+
+      <!-- TOY UI, RADIAL WHEEL & OUTLINER -->
+      <section id="ui-tools">
+        <h2>Toy UI, Radial Pie Wheel &amp; Outliner</h2>
+
+        <h3>8-Slice Bouncy Radial Pie Wheel</h3>
+        <p>
+          Hold <kbd>Space</kbd> and flick your mouse (release to confirm), tap the top <strong>Wheel</strong> button on
+          touchscreens, or hold <kbd>L1/LB</kbd> + flick <kbd>Right Stick</kbd> on a controller:
+        </p>
+        <div class="wheel-wrap">
+          <svg width="210" height="210" viewBox="0 0 210 210" aria-label="8-Slice Radial Pie Wheel">
+            <circle cx="105" cy="105" r="96" fill="#1b1e2c" stroke="rgba(255,255,255,0.2)" stroke-width="2" />
+            <circle cx="105" cy="105" r="28" fill="#2b3045" stroke="rgba(255,255,255,0.25)" stroke-width="2" />
+            <text x="105" y="109" text-anchor="middle" fill="#f0c266" font-size="10" font-weight="700">WHEEL</text>
+            <g fill="#eae6dc" font-size="9.5" font-weight="600" text-anchor="middle">
+              <text x="105" y="32">Add Clay</text>
+              <text x="158" y="54">Carve</text>
+              <text x="176" y="108">Paint</text>
+              <text x="154" y="160">Scope</text>
+              <text x="105" y="184">Copy Toy</text>
+              <text x="56" y="160">+ Limb</text>
+              <text x="36" y="108">Symmetry</text>
+              <text x="56" y="54">Play!</text>
+            </g>
+          </svg>
+          <div style="flex:1; min-width:220px;">
+            <p><strong>8 Quick Slices:</strong></p>
+            <ol style="margin-bottom:0;">
+              <li><strong>Add Clay</strong> — Build smooth clay onto surfaces</li>
+              <li><strong>Carve</strong> — Cut tunnels, caves, or dents</li>
+              <li><strong>Paint</strong> — Color &amp; restyle without changing shape</li>
+              <li><strong>Scope In / Out</strong> — Edit inside a Toy Prop</li>
+              <li><strong>Copy Toy</strong> — Live-Clone linked copies</li>
+              <li><strong>+ Limb</strong> — Attach a jointed child part</li>
+              <li><strong>Symmetry</strong> — Toggle Mirror X sculpting</li>
+              <li><strong>Play!</strong> — Jump into Play Mode</li>
+            </ol>
+          </div>
+        </div>
+
+        <h3>Tactile Sliders &amp; Scene Objects Outliner</h3>
+        <ul>
+          <li><strong>Sliders:</strong> <em>Brush Size</em>, <em>Soft Clay Blend</em>, <em>Painterly Fluffiness (Looseness)</em>, and <em>Miniature Camera Blur (Bokeh DOF)</em>.</li>
+          <li><strong>Scene Objects Outliner:</strong> Located on the right side of the viewport. Shows the <em>World Canvas</em> plus a hierarchical parent/child tree of all Toy Props, with quick buttons to focus, <strong>Move</strong>, or <strong>Edit Clay</strong> (Scope In), plus pagination for large scenes.</li>
+        </ul>
+      </section>
+
+      <!-- SAVE, LOAD & UNDO -->
+      <section id="save-load">
+        <h2>Saving, Loading &amp; Undo</h2>
+        <ul>
+          <li><strong>Undo / Redo:</strong> <kbd>Ctrl+Z</kbd> or <kbd>Z</kbd> to Undo; <kbd>Ctrl+Y</kbd> to Redo (supports strokes, prop spawning, deletion, cloning, and scene resets).</li>
+          <li><strong>Save Scene (<kbd>Ctrl+S</kbd> or <kbd>F5</kbd>):</strong> Saves your island, custom Toy Props, connectors, and recorded animations to <code>island_dream.ron</code>.</li>
+          <li><strong>Load Scene (<kbd>F9</kbd>):</strong> Reloads <code>island_dream.ron</code> from disk.</li>
+          <li><strong>Reset Island:</strong> Restores the default Floating Diorama Island (undoable).</li>
+        </ul>
+      </section>
+
+      <!-- CONTROLS ACROSS DEVICES -->
+      <section id="controls">
+        <h2>Controls Across All Devices</h2>
+        <p>Switch tabs to view controls for your input device, or search for any action:</p>
+        <input class="search-box" id="controlSearch" type="search" placeholder="Filter controls (e.g. carve, scope, clone, undo, camera, jump)..." />
+
+        <div class="tabs" role="tablist">
+          <button class="tab-btn active" data-tab="mk" type="button">Mouse &amp; Keyboard</button>
+          <button class="tab-btn" data-tab="touch" type="button">Multi-Touch / Tablet</button>
+          <button class="tab-btn" data-tab="pad" type="button">Game Controller</button>
+        </div>
+
+        <div class="tab-panel active" id="tab-mk">
+          <div class="table-wrap">
+            <table class="ctrl-table">
+              <thead><tr><th>Action</th><th>Control</th></tr></thead>
+              <tbody>
+                <tr><td>Sculpt / Paint / Grab Toy</td><td><kbd>Left Click + Drag</kbd> (<kbd>Alt + Left Drag</kbd> quick-carves)</td></tr>
+                <tr><td>Scope In / Out (Custom Toy)</td><td>Hover Toy + <kbd>Enter</kbd> or <kbd>V</kbd> • <kbd>Enter</kbd> / <kbd>Esc</kbd> Scope Out</td></tr>
+                <tr><td>Live Clone &amp; Make Unique</td><td><kbd>C</kbd> or <kbd>Ctrl+D</kbd> Live Clone • <kbd>U</kbd> Make Unique</td></tr>
+                <tr><td>Multi-Part Puppet Limbs</td><td><kbd>L</kbd> or <code>+ Attach Limb</code> pill</td></tr>
+                <tr><td>3D Rotate &amp; Scale Handles</td><td>In Animate mode (<kbd>3</kbd>): drag <strong>Turquoise Ring</strong> (Rotate) or <strong>Gold Orb</strong> (Scale)</td></tr>
+                <tr><td>Orbit / Pan / Zoom Camera</td><td><kbd>Right-Drag</kbd> Orbit • <kbd>Middle-Drag</kbd> or <kbd>Shift+Right-Drag</kbd> Pan • <kbd>Scroll</kbd> Zoom • <kbd>WASD</kbd>/<kbd>Q</kbd>/<kbd>E</kbd></td></tr>
+                <tr><td>Bouncy Radial Pie Wheel</td><td>Hold <kbd>Space</kbd> → flick mouse → release</td></tr>
+                <tr><td>Brush Size &amp; Smooth Blend</td><td><kbd>Shift+Scroll</kbd> or <kbd>[</kbd> / <kbd>]</kbd> Size/Scale • <kbd>Ctrl+Scroll</kbd> Smooth Blend</td></tr>
+                <tr><td>Modes</td><td><kbd>1</kbd> Sculpt • <kbd>2</kbd> Paint • <kbd>3</kbd> Animate • <kbd>4</kbd> or <kbd>Tab</kbd> Play!</td></tr>
+                <tr><td>Shapes / Flecks / Symmetry</td><td><kbd>F</kbd> Next Shape • <kbd>G</kbd> Next Fleck Style • <kbd>M</kbd> Mirror X</td></tr>
+                <tr><td>New Toy &amp; Action Recorder</td><td><kbd>P</kbd> New Custom Toy • <kbd>R</kbd> Arm Action Recorder → drag prop to record</td></tr>
+                <tr><td>Undo / Redo / Delete</td><td><kbd>Ctrl+Z</kbd> / <kbd>Z</kbd> Undo • <kbd>Ctrl+Y</kbd> Redo • <kbd>Delete</kbd> / <kbd>Backspace</kbd> Remove Toy</td></tr>
+                <tr><td>Save / Load</td><td><kbd>Ctrl+S</kbd> / <kbd>F5</kbd> Save (<code>island_dream.ron</code>) • <kbd>F9</kbd> Load</td></tr>
+                <tr><td>Play Mode</td><td><kbd>WASD</kbd> / Arrows Walk • <kbd>Space</kbd> Jump • <kbd>Right-Drag</kbd> Camera • <kbd>Tab</kbd> / <kbd>Esc</kbd> Sculpt</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-touch">
+          <div class="table-wrap">
+            <table class="ctrl-table">
+              <thead><tr><th>Action</th><th>Gesture</th></tr></thead>
+              <tbody>
+                <tr><td>Sculpt / Paint / Drag 3D Handles</td><td><strong>1-Finger Drag / Tap</strong></td></tr>
+                <tr><td>Scope In / Clone / Attach Limb</td><td>Tap <code>Scope In</code>, <code>Live Clone</code>, or <code>+ Attach Limb</code> pills (or Radial Wheel)</td></tr>
+                <tr><td>Orbit &amp; Pinch-Zoom Camera</td><td><strong>2-Finger Drag</strong> (Orbit) + <strong>2-Finger Pinch</strong> (Zoom)</td></tr>
+                <tr><td>Quick Undo / Redo</td><td><strong>2-Finger Tap</strong> (Undo) • <strong>3-Finger Tap</strong> (Redo)</td></tr>
+                <tr><td>Radial Pie Menu</td><td>Tap top <code>Wheel</code> button → tap any slice</td></tr>
+                <tr><td>Play Mode</td><td>Left screen side = Virtual Analog Stick • Bottom-right tap = Jump • Right drag = Orbit</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-pad">
+          <div class="table-wrap">
+            <table class="ctrl-table">
+              <thead><tr><th>Action</th><th>Control (Xbox / DualSense / Switch Pro)</th></tr></thead>
+              <tbody>
+                <tr><td>3D Imp &amp; Camera</td><td><kbd>Right Stick</kbd> moves 3D Imp • <kbd>Left Stick</kbd> orbits diorama</td></tr>
+                <tr><td>Analog Sculpt / Carve</td><td><kbd>R2</kbd> Analog Trigger (pull depth controls brush size) • <kbd>L2 + R2</kbd> Carve</td></tr>
+                <tr><td>Scope In / Out &amp; Live Clone</td><td><kbd>R1 / RB</kbd> Scope In / Out • <kbd>Select</kbd> Live-Clone Toy</td></tr>
+                <tr><td>Radial Pie Wheel</td><td>Hold <kbd>L1 / LB</kbd> + flick <kbd>Right Stick</kbd> → release <kbd>L1</kbd></td></tr>
+                <tr><td>Quick Cycle &amp; Undo</td><td><kbd>Y / Triangle</kbd> Shape • <kbd>B / Circle</kbd> Fleck • <kbd>X / Square</kbd> Mirror • <kbd>D-Pad Left/Right</kbd> Undo/Redo • <kbd>D-Pad Up/Down</kbd> Size</td></tr>
+                <tr><td>Toggle Play Mode</td><td><kbd>Start</kbd> (<kbd>Left Stick</kbd> Walk • <kbd>Right Stick</kbd> Camera • <kbd>A / Cross</kbd> Jump)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ARCHITECTURE -->
+      <section id="architecture">
+        <h2>Pipeline &amp; Crate Map</h2>
+        <p>Every brushstroke flows through Traum Engine's GPU compute and painterly rendering pipeline:</p>
+        <div class="pipeline">
+          <div class="pipe-step">CSG Edit List</div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">Sparse 8×8×8 SDF Bricks</div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">Iso-Surface Fleck Extractor</div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">Instanced Fleck Splatting + SDF AO</div>
+          <span class="pipe-arrow">→</span>
+          <div class="pipe-step">Bokeh DOF + Toy UI</div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Crate</th><th>Responsibility</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>traum-core</code></td><td>Primitive shapes, Fleck styles, Motion Gadgets, Connectors, CSG Edit Lists, Scene &amp; RON serialization.</td></tr>
+              <tr><td><code>traum-input</code></td><td>Unified Imp input hub across Mouse/KB, Multi-Touch (<code>winit</code>), and Gamepad (<code>gilrs</code>) + spring-damped Camera Rig.</td></tr>
+              <tr><td><code>traum-sdf</code></td><td>CPU/GPU-mirrored SDF math, dirty brick &amp; asset trackers, scene raycasting, and sphere collision resolution.</td></tr>
+              <tr><td><code>traum-render</code></td><td><code>wgpu</code> pipelines, WGSL compute shaders, fleck splatting, bokeh post-processing, 2D Toy UI, and headless <code>--self-test</code>.</td></tr>
+              <tr><td><code>traum-editor</code></td><td>Stateful editor tools, Scope-In, Live-Clone, 3D handles, Action Recorder, Radial Pie UI, Outliner, and Play Mode puppet.</td></tr>
+              <tr><td><code>traum-app</code></td><td>Windowed <code>winit 0.30</code> event loop, frame timing, and CLI <code>--self-test</code> entrypoint.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    // Populate the 12 curated PALETTE_SRGB clay colors from traum-core
+    const palette = [
+      { name: "Warm Terracotta Clay", rgb: [0.88, 0.46, 0.32] },
+      { name: "Sunlit Ochre Gold",    rgb: [0.94, 0.76, 0.42] },
+      { name: "Meadow Moss Green",    rgb: [0.42, 0.72, 0.38] },
+      { name: "Deep Pine Teal",       rgb: [0.24, 0.56, 0.46] },
+      { name: "Storybook Sky Blue",   rgb: [0.38, 0.64, 0.88] },
+      { name: "Twilight Lavender",    rgb: [0.62, 0.46, 0.84] },
+      { name: "Coral Rose",           rgb: [0.90, 0.44, 0.58] },
+      { name: "Cloud Cream White",    rgb: [0.95, 0.92, 0.86] },
+      { name: "Bark Umber Brown",     rgb: [0.54, 0.43, 0.35] },
+      { name: "Carved Cliff Slate",   rgb: [0.58, 0.61, 0.66] },
+      { name: "Charcoal Ink",         rgb: [0.22, 0.23, 0.27] },
+      { name: "Lantern Amber Glow",   rgb: [1.00, 0.68, 0.22] },
+    ];
+
+    const toHex = ([r, g, b]) =>
+      "#" + [r, g, b].map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
+
+    const grid = document.getElementById("paletteGrid");
+    palette.forEach((c) => {
+      const hex = toHex(c.rgb);
+      const card = document.createElement("div");
+      card.className = "swatch-card";
+      card.innerHTML = `
+        <div class="swatch-dot" style="background:${hex}"></div>
+        <div>
+          <div class="swatch-name">${c.name}</div>
+          <div class="swatch-hex">${hex}</div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    // Device control tabs
+    const tabBtns = document.querySelectorAll(".tab-btn");
+    const tabPanels = document.querySelectorAll(".tab-panel");
+    tabBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        tabBtns.forEach((b) => b.classList.remove("active"));
+        tabPanels.forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+      });
+    });
+
+    // Controls search filter
+    const searchInput = document.getElementById("controlSearch");
+    searchInput.addEventListener("input", () => {
+      const q = searchInput.value.trim().toLowerCase();
+      document.querySelectorAll(".ctrl-table tbody tr").forEach((row) => {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
+    });
+
+    // Mobile sidebar toggle
+    const sidebar = document.getElementById("sidebar");
+    document.getElementById("menuToggle").addEventListener("click", () => {
+      sidebar.classList.toggle("open");
+    });
+
+    // Active sidebar link on scroll
+    const navLinks = Array.from(document.querySelectorAll(".nav-link"));
+    const targets = navLinks
+      .map((a) => document.querySelector(a.getAttribute("href")))
+      .filter(Boolean);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            navLinks.forEach((l) => l.classList.remove("active"));
+            const active = navLinks.find((l) => l.getAttribute("href") === "#" + entry.target.id);
+            if (active) active.classList.add("active");
+          }
+        });
+      },
+      { rootMargin: "-20% 0px -70% 0px" }
+    );
+    targets.forEach((t) => observer.observe(t));
+
+    navLinks.forEach((l) =>
+      l.addEventListener("click", () => sidebar.classList.remove("open"))
+    );
+  </script>
+</body>
+</html>
