@@ -214,6 +214,13 @@ pub enum UiAction {
     ResetIsland,
     OpenRadialButton,
     ToggleHelp,
+    ToggleOutliner,
+    OutlinerSelectWorld,
+    OutlinerSelectProp(u32),
+    OutlinerMoveProp(u32),
+    OutlinerEditPropClay(u32),
+    OutlinerPagePrev,
+    OutlinerPageNext,
     DragSliderSize,
     DragSliderBlend,
     DragSliderLoose,
@@ -281,6 +288,8 @@ pub struct TraumEditor {
     radial_anchor_px: Vec2,
     radial_hovered: Option<usize>,
     pub show_help_guide: bool,
+    pub outliner_open: bool,
+    pub outliner_page: usize,
     status_toast: String,
     status_timer: f32,
 
@@ -328,6 +337,8 @@ impl TraumEditor {
             radial_anchor_px: Vec2::new(400.0, 300.0),
             radial_hovered: None,
             show_help_guide: false,
+            outliner_open: true,
+            outliner_page: 0,
             status_toast: "Hover any button to see a tooltip! Drag to sculpt clay, Right-Drag to orbit.".into(),
             status_timer: 6.5,
             undo_stack: Vec::new(),
@@ -1572,7 +1583,7 @@ impl TraumEditor {
         }
 
         camera.target_focus = self.puppet.position + Vec3::new(0.0, 0.55, 0.0);
-        camera.target_distance = camera.target_distance.clamp(5.0, 14.0);
+        camera.target_distance = camera.target_distance.clamp(3.2, 28.0);
     }
 
     // ========================================================================
@@ -2493,8 +2504,8 @@ impl TraumEditor {
                 }
             }
 
-            // 6. Right-Side Tactile Sliders Card (`BRUSH & CAMERA`) — High-Contrast Full-Width Text!
-            let slider_w = 212.0 * s;
+            // 6. Right-Side Tactile Sliders Card (`FEEL & CAMERA`) — High-Contrast Full-Width Text!
+            let slider_w = 228.0 * s;
             let sx1 = w - 14.0 * s;
             let sx0 = (sx1 - slider_w).max(lx1 + 24.0 * s);
             let mut sy = docks_top_y;
@@ -2619,6 +2630,425 @@ impl TraumEditor {
                 });
 
                 sy += s_step;
+            }
+
+            // 6B. Right-Side `SCENE OBJECTS` Outliner Card (World Canvas + Hierarchical Toy Tree + Quick Actions!)
+            let swatch_top_reserve = h - 74.0 * s;
+            let outliner_y0 = sy + 14.0 * s;
+            let avail_outliner_h = swatch_top_reserve - outliner_y0;
+
+            if avail_outliner_h > 44.0 * s {
+                let prop_count = self.scene.props.len();
+                if !self.outliner_open || avail_outliner_h < 145.0 * s {
+                    rects.push(UiRect {
+                        min: Vec2::new(sx0, outliner_y0),
+                        max: Vec2::new(sx1, outliner_y0 + 34.0 * s),
+                        fill_srgb: [0.14, 0.16, 0.24, 0.92],
+                        border_srgb: [0.46, 0.54, 0.72, 0.65],
+                        corner_radius: 15.0 * s,
+                        border_width: 1.4 * s,
+                        style: UiRectStyle::Button,
+                        icon: Some(5),
+                        label: format!("Scene Objects ({prop_count})"),
+                        right_label: "Show".into(),
+                        font_px: 11.2 * s,
+                        left_align_text: true,
+                        text_srgb: [0.95, 0.97, 1.0, 1.0],
+                        hovered: false,
+                        cast_shadow: true,
+                        action: Some(UiAction::ToggleOutliner),
+                        tooltip: Some((
+                            "Expand Scene Objects Outliner".into(),
+                            "Click to Open".into(),
+                            "Shows a hierarchical list of the World Island and all movable Toy Objects in your scene.".into(),
+                        )),
+                    });
+                } else {
+                    let tree = self.build_outliner_tree();
+                    let row_h = 28.0 * s;
+                    let row_step_o = 31.5 * s;
+                    // Reserve header (24) + World row (32) + bottom action strip (36) + optional pager (28)
+                    let chrome_h = 24.0 * s + row_step_o + 40.0 * s;
+                    let raw_max_rows = ((avail_outliner_h - chrome_h) / row_step_o).floor().max(1.0) as usize;
+                    let needs_pager = tree.len() > raw_max_rows;
+                    let max_rows = if needs_pager {
+                        ((avail_outliner_h - chrome_h - 28.0 * s) / row_step_o)
+                            .floor()
+                            .max(1.0) as usize
+                    } else {
+                        raw_max_rows
+                    };
+
+                    let total_pages = tree.len().div_ceil(max_rows).max(1);
+                    if self.outliner_page >= total_pages {
+                        self.outliner_page = total_pages - 1;
+                    }
+                    let start_i = self.outliner_page * max_rows;
+                    let end_i = (start_i + max_rows).min(tree.len());
+                    let visible_slice = &tree[start_i..end_i];
+
+                    let has_sel_prop = self
+                        .selected_prop_id
+                        .and_then(|id| self.scene.props.iter().find(|p| p.id == id))
+                        .is_some();
+                    let pager_h = if needs_pager { 28.0 * s } else { 0.0 };
+                    let footer_h = if has_sel_prop { 36.0 * s } else { 4.0 * s };
+                    let card_h = 24.0 * s
+                        + (1 + visible_slice.len()) as f32 * row_step_o
+                        + pager_h
+                        + footer_h
+                        + 6.0 * s;
+
+                    rects.push(mk_panel(
+                        Vec2::new(sx0 - 6.0 * s, outliner_y0 - 6.0 * s),
+                        Vec2::new(sx1 + 6.0 * s, outliner_y0 + card_h),
+                        18.0,
+                    ));
+
+                    // Header + Hide toggle chip
+                    rects.push(mk_header(
+                        sx0 + 6.0 * s,
+                        sx1 - 54.0 * s,
+                        outliner_y0,
+                        &format!("SCENE OBJECTS ({prop_count})"),
+                    ));
+                    rects.push(UiRect {
+                        min: Vec2::new(sx1 - 48.0 * s, outliner_y0 - 1.0 * s),
+                        max: Vec2::new(sx1, outliner_y0 + 19.0 * s),
+                        fill_srgb: [0.16, 0.19, 0.28, 0.88],
+                        border_srgb: [0.44, 0.50, 0.66, 0.55],
+                        corner_radius: 9.0 * s,
+                        border_width: 1.0 * s,
+                        style: UiRectStyle::Button,
+                        icon: None,
+                        label: "Hide".into(),
+                        right_label: String::new(),
+                        font_px: 9.8 * s,
+                        left_align_text: false,
+                        text_srgb: [0.84, 0.89, 0.98, 1.0],
+                        hovered: false,
+                        cast_shadow: false,
+                        action: Some(UiAction::ToggleOutliner),
+                        tooltip: Some((
+                            "Collapse Outliner".into(),
+                            "Click".into(),
+                            "Hides the Scene Objects list to free up right-side screen space.".into(),
+                        )),
+                    });
+
+                    let mut oy = outliner_y0 + 23.0 * s;
+
+                    // Fixed Row 0: World Island Canvas!
+                    let world_active = self.scoped_prop_id.is_none()
+                        && (self.brush.mode == EditorMode::Sculpt
+                            || self.brush.mode == EditorMode::Paint);
+                    rects.push(UiRect {
+                        min: Vec2::new(sx0, oy),
+                        max: Vec2::new(sx1, oy + row_h),
+                        fill_srgb: if world_active {
+                            [0.72, 0.44, 0.22, 0.95]
+                        } else {
+                            [0.13, 0.15, 0.22, 0.90]
+                        },
+                        border_srgb: if world_active {
+                            [1.0, 0.92, 0.72, 0.92]
+                        } else {
+                            [0.36, 0.40, 0.52, 0.50]
+                        },
+                        corner_radius: 12.0 * s,
+                        border_width: if world_active { 1.6 * s } else { 1.1 * s },
+                        style: UiRectStyle::Button,
+                        icon: Some(14),
+                        label: "World Island".into(),
+                        right_label: "Canvas".into(),
+                        font_px: 10.8 * s,
+                        left_align_text: true,
+                        text_srgb: [0.98, 0.98, 1.0, 1.0],
+                        hovered: false,
+                        cast_shadow: false,
+                        action: Some(UiAction::OutlinerSelectWorld),
+                        tooltip: Some((
+                            "World Island Canvas".into(),
+                            "Base Terrain".into(),
+                            "The shared floating island ground, hills, caves, trees, and clouds. Click to sculpt the main island.".into(),
+                        )),
+                    });
+                    oy += row_step_o;
+
+                    // Hierarchical Toy Object rows
+                    for &(prop_id, depth) in visible_slice {
+                        let Some(prop) = self.scene.props.iter().find(|p| p.id == prop_id) else {
+                            continue;
+                        };
+                        let is_sel = self.selected_prop_id == Some(prop_id);
+                        let is_scoped = self.scoped_prop_id == Some(prop_id);
+                        let indent = (depth as f32 * 13.0 * s).min(26.0 * s);
+
+                        let clones = self
+                            .scene
+                            .props
+                            .iter()
+                            .filter(|x| x.asset_id == prop.asset_id)
+                            .count();
+
+                        let badge = if is_scoped {
+                            "Clay".to_string()
+                        } else if prop.clip.is_some() {
+                            "Rec".to_string()
+                        } else if clones > 1 {
+                            format!("{clones}x")
+                        } else if prop.gadget != MotionGadget::None {
+                            prop.gadget.label().to_string()
+                        } else {
+                            String::new()
+                        };
+
+                        let max_name_chars = if badge.is_empty() {
+                            18usize.saturating_sub(depth * 2)
+                        } else {
+                            13usize.saturating_sub(depth * 2)
+                        };
+                        let short_name = truncate_label_chars(&prop.name, max_name_chars.max(6));
+                        let icon_id = if is_scoped {
+                            8
+                        } else if depth > 0 {
+                            16
+                        } else {
+                            5
+                        };
+
+                        let fill = if is_scoped {
+                            [0.16, 0.58, 0.78, 0.97]
+                        } else if is_sel {
+                            [0.44, 0.34, 0.78, 0.96]
+                        } else {
+                            [0.15, 0.17, 0.25, 0.90]
+                        };
+
+                        let tip_sub = if is_sel {
+                            "Click Again for 3D Gizmo"
+                        } else {
+                            "Click to Select & Frame"
+                        };
+                        let parent_info = prop
+                            .connector
+                            .as_ref()
+                            .and_then(|c| {
+                                self.scene
+                                    .props
+                                    .iter()
+                                    .find(|p| p.id == c.parent_id)
+                                    .map(|par| format!("Attached to {} ({}). ", par.name, c.kind.label()))
+                            })
+                            .unwrap_or_default();
+                        let clone_info = if clones > 1 {
+                            format!("Shares linked clay with {clones} copies. ")
+                        } else {
+                            String::new()
+                        };
+
+                        rects.push(UiRect {
+                            min: Vec2::new(sx0 + indent, oy),
+                            max: Vec2::new(sx1, oy + row_h),
+                            fill_srgb: fill,
+                            border_srgb: if is_sel || is_scoped {
+                                [1.0, 0.94, 0.76, 0.96]
+                            } else {
+                                [0.38, 0.42, 0.56, 0.50]
+                            },
+                            corner_radius: 12.0 * s,
+                            border_width: if is_sel || is_scoped { 1.7 * s } else { 1.1 * s },
+                            style: UiRectStyle::Button,
+                            icon: Some(icon_id),
+                            label: short_name,
+                            right_label: badge,
+                            font_px: 10.6 * s,
+                            left_align_text: true,
+                            text_srgb: [0.98, 0.99, 1.0, 1.0],
+                            hovered: false,
+                            cast_shadow: false,
+                            action: Some(UiAction::OutlinerSelectProp(prop_id)),
+                            tooltip: Some((
+                                format!("{} (Toy #{prop_id})", prop.name),
+                                tip_sub.into(),
+                                format!("{parent_info}{clone_info}Click to select and center the camera on this Toy. Use Move / Clay / Del below!"),
+                            )),
+                        });
+                        oy += row_step_o;
+                    }
+
+                    // Optional Pagination Row (`< Prev` | `1/2` | `Next >`)
+                    if needs_pager {
+                        let pw = 56.0 * s;
+                        rects.push(UiRect {
+                            min: Vec2::new(sx0, oy),
+                            max: Vec2::new(sx0 + pw, oy + 24.0 * s),
+                            fill_srgb: [0.16, 0.18, 0.27, 0.92],
+                            border_srgb: [0.45, 0.50, 0.65, 0.55],
+                            corner_radius: 10.0 * s,
+                            border_width: 1.1 * s,
+                            style: UiRectStyle::Button,
+                            icon: None,
+                            label: "< Prev".into(),
+                            right_label: String::new(),
+                            font_px: 9.8 * s,
+                            left_align_text: false,
+                            text_srgb: [0.92, 0.95, 1.0, 1.0],
+                            hovered: false,
+                            cast_shadow: false,
+                            action: Some(UiAction::OutlinerPagePrev),
+                            tooltip: Some((
+                                "Previous Page".into(),
+                                "Click".into(),
+                                "Shows earlier Toy Objects in the Scene Outliner.".into(),
+                            )),
+                        });
+                        rects.push(UiRect {
+                            min: Vec2::new(sx0 + pw, oy),
+                            max: Vec2::new(sx1 - pw, oy + 24.0 * s),
+                            fill_srgb: [0.0; 4],
+                            border_srgb: [0.0; 4],
+                            corner_radius: 4.0,
+                            border_width: 0.0,
+                            style: UiRectStyle::Panel,
+                            icon: None,
+                            label: format!("{}/{}", self.outliner_page + 1, total_pages),
+                            right_label: String::new(),
+                            font_px: 9.8 * s,
+                            left_align_text: false,
+                            text_srgb: [0.76, 0.82, 0.94, 1.0],
+                            hovered: false,
+                            cast_shadow: false,
+                            action: None,
+                            tooltip: None,
+                        });
+                        rects.push(UiRect {
+                            min: Vec2::new(sx1 - pw, oy),
+                            max: Vec2::new(sx1, oy + 24.0 * s),
+                            fill_srgb: [0.16, 0.18, 0.27, 0.92],
+                            border_srgb: [0.45, 0.50, 0.65, 0.55],
+                            corner_radius: 10.0 * s,
+                            border_width: 1.1 * s,
+                            style: UiRectStyle::Button,
+                            icon: None,
+                            label: "Next >".into(),
+                            right_label: String::new(),
+                            font_px: 9.8 * s,
+                            left_align_text: false,
+                            text_srgb: [0.92, 0.95, 1.0, 1.0],
+                            hovered: false,
+                            cast_shadow: false,
+                            action: Some(UiAction::OutlinerPageNext),
+                            tooltip: Some((
+                                "Next Page".into(),
+                                "Click".into(),
+                                "Shows more Toy Objects in the Scene Outliner.".into(),
+                            )),
+                        });
+                        oy += 28.0 * s;
+                    }
+
+                    // Quick Action Strip for Selected Toy: `[Move]` | `[Clay / Exit]` | `[Del]`
+                    if let Some(sel_id) = self
+                        .selected_prop_id
+                        .filter(|id| self.scene.props.iter().any(|p| p.id == *id))
+                    {
+                        oy += 4.0 * s;
+                        let agap = 5.0 * s;
+                        let aw = (sx1 - sx0 - agap * 2.0) / 3.0;
+                        let ah = 29.0 * s;
+                        let is_scoped_sel = self.scoped_prop_id == Some(sel_id);
+                        let is_move_active =
+                            self.brush.mode == EditorMode::Animate && !is_scoped_sel;
+
+                        // [Move] button
+                        rects.push(UiRect {
+                            min: Vec2::new(sx0, oy),
+                            max: Vec2::new(sx0 + aw, oy + ah),
+                            fill_srgb: if is_move_active {
+                                [0.56, 0.38, 0.86, 0.97]
+                            } else {
+                                [0.18, 0.20, 0.30, 0.94]
+                            },
+                            border_srgb: [0.64, 0.56, 0.90, 0.72],
+                            corner_radius: 12.0 * s,
+                            border_width: 1.3 * s,
+                            style: UiRectStyle::Button,
+                            icon: Some(3),
+                            label: "Move".into(),
+                            right_label: String::new(),
+                            font_px: 10.4 * s,
+                            left_align_text: false,
+                            text_srgb: [0.98, 0.99, 1.0, 1.0],
+                            hovered: false,
+                            cast_shadow: false,
+                            action: Some(UiAction::OutlinerMoveProp(sel_id)),
+                            tooltip: Some((
+                                "Move, Rotate & Scale Toy".into(),
+                                "3D Gizmo".into(),
+                                "Switches to Animate mode with the 3D ring & scale orb around this Toy so you can drag, spin, or resize it.".into(),
+                            )),
+                        });
+
+                        // [Clay] / [Exit] Scope button
+                        rects.push(UiRect {
+                            min: Vec2::new(sx0 + aw + agap, oy),
+                            max: Vec2::new(sx0 + aw * 2.0 + agap, oy + ah),
+                            fill_srgb: if is_scoped_sel {
+                                [0.16, 0.60, 0.80, 0.97]
+                            } else {
+                                [0.18, 0.22, 0.32, 0.94]
+                            },
+                            border_srgb: [0.48, 0.76, 0.94, 0.75],
+                            corner_radius: 12.0 * s,
+                            border_width: 1.3 * s,
+                            style: UiRectStyle::Button,
+                            icon: Some(8),
+                            label: if is_scoped_sel {
+                                "Exit".into()
+                            } else {
+                                "Clay".into()
+                            },
+                            right_label: String::new(),
+                            font_px: 10.4 * s,
+                            left_align_text: false,
+                            text_srgb: [0.98, 0.99, 1.0, 1.0],
+                            hovered: false,
+                            cast_shadow: false,
+                            action: Some(UiAction::OutlinerEditPropClay(sel_id)),
+                            tooltip: Some((
+                                "Sculpt Inside This Toy".into(),
+                                "Key: Enter".into(),
+                                "Enters (or exits) solo clay sculpting on this Toy so your brush reshapes or paints it without touching the island.".into(),
+                            )),
+                        });
+
+                        // [Del] button
+                        rects.push(UiRect {
+                            min: Vec2::new(sx0 + (aw + agap) * 2.0, oy),
+                            max: Vec2::new(sx1, oy + ah),
+                            fill_srgb: [0.34, 0.16, 0.21, 0.93],
+                            border_srgb: [0.82, 0.42, 0.48, 0.68],
+                            corner_radius: 12.0 * s,
+                            border_width: 1.3 * s,
+                            style: UiRectStyle::Button,
+                            icon: Some(17),
+                            label: "Del".into(),
+                            right_label: String::new(),
+                            font_px: 10.4 * s,
+                            left_align_text: false,
+                            text_srgb: [1.0, 0.94, 0.95, 1.0],
+                            hovered: false,
+                            cast_shadow: false,
+                            action: Some(UiAction::DeleteProp),
+                            tooltip: Some((
+                                "Delete Selected Toy".into(),
+                                "Key: Delete".into(),
+                                "Deletes this Toy (and any attached child parts) from the scene. Undoable anytime with Ctrl+Z.".into(),
+                            )),
+                        });
+                    }
+                }
             }
 
             // 7. Bottom Clay Color Palette Tray (12 Named Colors with Tooltips!)
@@ -2925,6 +3355,77 @@ impl TraumEditor {
                     UiAction::ToggleHelp => {
                         self.show_help_guide = !self.show_help_guide;
                     }
+                    UiAction::ToggleOutliner => {
+                        self.outliner_open = !self.outliner_open;
+                    }
+                    UiAction::OutlinerSelectWorld => {
+                        self.finish_stroke();
+                        self.scoped_prop_id = None;
+                        if self.brush.mode == EditorMode::Animate {
+                            self.brush.mode = EditorMode::Sculpt;
+                        }
+                        camera.target_focus = Vec3::new(0.0, 0.9, 0.0);
+                        camera.target_distance = camera.target_distance.clamp(9.0, 16.0);
+                        self.set_toast("Selected World Island Canvas — Drag to sculpt or paint the island!");
+                    }
+                    UiAction::OutlinerSelectProp(pid) => {
+                        self.finish_stroke();
+                        let already_selected = self.selected_prop_id == Some(pid);
+                        self.selected_prop_id = Some(pid);
+                        if let Some(prop) = self.scene.props.iter().find(|p| p.id == pid).cloned() {
+                            let (p_pos, _) = self.scene.evaluate_prop_pose(pid, self.time);
+                            camera.target_focus = p_pos;
+                            camera.target_distance = (prop.uniform_scale * 6.8).clamp(4.5, 13.0);
+
+                            if self.scoped_prop_id.is_some() && self.scoped_prop_id != Some(pid) {
+                                self.scoped_prop_id = Some(pid);
+                                self.set_toast(format!("Switched Clay Edit to {}", prop.name));
+                            } else if already_selected && self.scoped_prop_id.is_none() {
+                                self.brush.mode = EditorMode::Animate;
+                                self.set_toast(format!(
+                                    "{} — Drag body to move, ring to rotate, or orb to resize!",
+                                    prop.name
+                                ));
+                            } else {
+                                self.set_toast(format!(
+                                    "Selected {} — Click Move to pose, or Clay to sculpt inside it!",
+                                    prop.name
+                                ));
+                            }
+                        }
+                    }
+                    UiAction::OutlinerMoveProp(pid) => {
+                        self.finish_stroke();
+                        self.selected_prop_id = Some(pid);
+                        self.scoped_prop_id = None;
+                        self.brush.mode = EditorMode::Animate;
+                        if let Some(prop) = self.scene.props.iter().find(|p| p.id == pid) {
+                            let (p_pos, _) = self.scene.evaluate_prop_pose(pid, self.time);
+                            camera.target_focus = p_pos;
+                            camera.target_distance = (prop.uniform_scale * 6.8).clamp(4.5, 13.0);
+                            self.set_toast(format!(
+                                "Moving {} — Drag body to move, turquoise ring to rotate, gold orb to scale!",
+                                prop.name
+                            ));
+                        }
+                    }
+                    UiAction::OutlinerEditPropClay(pid) => {
+                        self.finish_stroke();
+                        if self.scoped_prop_id == Some(pid) {
+                            self.scope_out();
+                        } else {
+                            self.selected_prop_id = Some(pid);
+                            self.scoped_prop_id = None;
+                            self.imp.hovered_prop_id = pid;
+                            self.toggle_scope_in_out(camera);
+                        }
+                    }
+                    UiAction::OutlinerPagePrev => {
+                        self.outliner_page = self.outliner_page.saturating_sub(1);
+                    }
+                    UiAction::OutlinerPageNext => {
+                        self.outliner_page += 1;
+                    }
                 }
             }
             return true;
@@ -2935,7 +3436,7 @@ impl TraumEditor {
 
     fn apply_slider_drag(&mut self, slider: UiAction, cursor_x: f32, viewport_w: f32, s: f32) {
         let lx1 = 14.0 * s + 208.0 * s;
-        let slider_w = 212.0 * s;
+        let slider_w = 228.0 * s;
         let sx1 = viewport_w - 14.0 * s;
         let sx0 = (sx1 - slider_w).max(lx1 + 24.0 * s);
         let t = ((cursor_x - sx0) / (sx1 - sx0).max(1.0)).clamp(0.0, 1.0);
@@ -2978,6 +3479,67 @@ impl TraumEditor {
             7 => self.switch_mode(EditorMode::Play, camera),
             _ => {}
         }
+    }
+
+    /// Builds a clean parent -> child depth-first list `(prop_id, depth)` for the Scene Objects Outliner.
+    pub fn build_outliner_tree(&self) -> Vec<(u32, usize)> {
+        let mut out = Vec::with_capacity(self.scene.props.len());
+        let mut visited = Vec::with_capacity(self.scene.props.len());
+
+        fn visit_children(
+            props: &[SceneProp],
+            parent_id: u32,
+            depth: usize,
+            visited: &mut Vec<u32>,
+            out: &mut Vec<(u32, usize)>,
+        ) {
+            if depth > 6 {
+                return;
+            }
+            for p in props {
+                if p.connector.as_ref().map(|c| c.parent_id) == Some(parent_id)
+                    && !visited.contains(&p.id)
+                {
+                    visited.push(p.id);
+                    out.push((p.id, depth));
+                    visit_children(props, p.id, depth + 1, visited, out);
+                }
+            }
+        }
+
+        // Emit root props first (no connector, or parent doesn't exist), followed by their attached children!
+        for p in &self.scene.props {
+            let is_root = match &p.connector {
+                None => true,
+                Some(c) => !self.scene.props.iter().any(|x| x.id == c.parent_id),
+            };
+            if is_root && !visited.contains(&p.id) {
+                visited.push(p.id);
+                out.push((p.id, 0));
+                visit_children(&self.scene.props, p.id, 1, &mut visited, &mut out);
+            }
+        }
+
+        // Safety fallback for any cyclic connector edge case
+        for p in &self.scene.props {
+            if !visited.contains(&p.id) {
+                visited.push(p.id);
+                out.push((p.id, 0));
+            }
+        }
+
+        out
+    }
+}
+
+fn truncate_label_chars(text: &str, max_chars: usize) -> String {
+    let count = text.chars().count();
+    if count <= max_chars {
+        text.to_string()
+    } else {
+        let mut s: String = text.chars().take(max_chars.saturating_sub(2)).collect();
+        s.push_str("..");
+        s
     }
 }
 
@@ -3176,6 +3738,18 @@ mod tests {
             walked_dist > 2.5,
             "Expected character to walk >2.5m freely across meadow, moved only {walked_dist}m"
         );
+        // Verify shader inverse-Y rotation maps actual walked direction onto local `+Z` (where eyes & visor are)!
+        let travel_dir = Vec2::new(
+            editor.puppet.position.x - start_pos.x,
+            editor.puppet.position.z - start_pos.z,
+        )
+        .normalize();
+        let yaw = editor.puppet.facing_yaw;
+        let local_z_of_travel = travel_dir.x * yaw.sin() + travel_dir.y * yaw.cos();
+        assert!(
+            local_z_of_travel > 0.96,
+            "Character local +Z (eyes/visor) must align with travel direction, dot={local_z_of_travel}"
+        );
 
         // Jump! Must launch upward cleanly
         editor.update(
@@ -3220,6 +3794,57 @@ mod tests {
             editor.puppet.position.y > 0.45,
             "Embedded puppet must pop out above ground, got y={}",
             editor.puppet.position.y
+        );
+    }
+
+    #[test]
+    fn scene_outliner_tree_and_row_selection_work() {
+        let mut editor = TraumEditor::new();
+        let mut cam = CameraRig::default();
+
+        // Starter island has Critter (id=4, depth=0) followed immediately by its child Sprout Ears (id=5, depth=1)
+        let tree = editor.build_outliner_tree();
+        assert_eq!(tree.len(), editor.scene.props.len());
+        let critter_pos = tree.iter().position(|&(id, _)| id == 4).unwrap();
+        assert_eq!(tree[critter_pos], (4, 0));
+        assert_eq!(tree[critter_pos + 1], (5, 1));
+
+        // Build UI on a standard 1360x820 viewport and click the Spinning Sky Ring (id=3) row in the Outliner!
+        let ui = editor.update(
+            0.016,
+            &FrameInput {
+                imp_px: Vec2::new(680.0, 410.0),
+                viewport: Vec2::new(1360.0, 820.0),
+                ui_scale: 1.0,
+                ..Default::default()
+            },
+            ActiveInputDevice::MouseKeyboard,
+            &mut cam,
+        );
+        let ring_row = ui
+            .rects
+            .iter()
+            .find(|r| r.action == Some(UiAction::OutlinerSelectProp(3)))
+            .expect("Expected Spinning Sky Ring row in Scene Objects Outliner");
+        let click_pt = (ring_row.min + ring_row.max) * 0.5;
+
+        editor.update(
+            0.016,
+            &FrameInput {
+                imp_px: click_pt,
+                viewport: Vec2::new(1360.0, 820.0),
+                ui_scale: 1.0,
+                primary_down: true,
+                primary_just_pressed: true,
+                ..Default::default()
+            },
+            ActiveInputDevice::MouseKeyboard,
+            &mut cam,
+        );
+        assert_eq!(editor.selected_prop_id, Some(3));
+        assert!(
+            cam.target_focus.distance(Vec3::new(-2.4, 4.15, -1.8)) < 1.0,
+            "Clicking Outliner row should focus camera on Spinning Sky Ring"
         );
     }
 }

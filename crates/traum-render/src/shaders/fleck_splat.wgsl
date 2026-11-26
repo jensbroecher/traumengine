@@ -125,10 +125,10 @@ fn vs_fleck(
     }
 
     let dist_cam = length(world_p - cam_pos);
+    // Constant 1.8cm world-space offset toward camera prevents z-fighting on clay WITHOUT pulling flecks meters forward when zoomed out!
+    let biased_world = world_p + to_cam * 0.018;
     var vout: VsOut;
-    vout.clip_pos = u_frame.view_proj * vec4<f32>(world_p, 1.0);
-    // Tiny depth bias forward so surface flecks sit cleanly on top of their own clay shell without z-fighting
-    vout.clip_pos.z = max(vout.clip_pos.z - 0.0012 * vout.clip_pos.w, 0.0);
+    vout.clip_pos = u_frame.view_proj * vec4<f32>(biased_world, 1.0);
     vout.local_uv = corner;
     vout.lit_color = lit;
     vout.style_seed_loose = vec3<f32>(style, seed, loose);

@@ -143,9 +143,10 @@ fn eval_puppet(p: vec3<f32>) -> HitMaterial {
         return m;
     }
 
+    // Inverse Y-rotation (`R_y(yaw)^T`) mapping world forward `(sin(yaw), 0, cos(yaw))` -> local `+Z` `(0, 0, 1)`!
     let yaw = u_frame.puppet_pos_yaw.w;
-    let cy = cos(-yaw);
-    let sy = sin(-yaw);
+    let cy = cos(yaw);
+    let sy = sin(yaw);
     let rel = p - base;
     let lp = vec3<f32>(rel.x * cy - rel.z * sy, rel.y, rel.x * sy + rel.z * cy);
 
@@ -159,19 +160,31 @@ fn eval_puppet(p: vec3<f32>) -> HitMaterial {
     var col = vec3<f32>(0.94, 0.38, 0.26);
     var style = 0.0;
 
+    // Bright cream front visor patch on `+Z` + teal explorer backpack on `-Z` so facing direction is unmistakable!
+    let d_visor = length((body_p - vec3<f32>(0.0, 0.21, 0.22)) / vec3<f32>(0.23, 0.14, 0.13)) * 0.14 - 0.14;
+    if (d_visor < d_body) {
+        d_body = d_visor;
+        col = vec3<f32>(0.98, 0.94, 0.86);
+    }
+    let d_pack = eval_capsule_y(body_p - vec3<f32>(0.0, 0.08, -0.26), 0.16, 0.07);
+    if (d_pack < d_body) {
+        d_body = d_pack;
+        col = vec3<f32>(0.20, 0.62, 0.72);
+    }
+
     let bob = sin(u_frame.cam_pos_time.w * 7.0) * 0.05;
-    let d_pom = length(body_p - vec3<f32>(bob, 0.68, -0.04)) - 0.11;
+    let d_pom = length(body_p - vec3<f32>(bob, 0.68, 0.06)) - 0.11;
     if (d_pom < d_body) {
         d_body = d_pom;
         col = vec3<f32>(1.0, 0.72, 0.18);
         style = 4.0;
     }
 
-    let eye_x = abs(body_p.x) - 0.13;
-    let d_eye = length(vec3<f32>(eye_x, body_p.y - 0.22, body_p.z - 0.28)) - 0.065;
+    let eye_x = abs(body_p.x) - 0.11;
+    let d_eye = length(vec3<f32>(eye_x, body_p.y - 0.22, body_p.z - 0.33)) - 0.058;
     if (d_eye < d_body) {
         d_body = d_eye;
-        col = vec3<f32>(0.04, 0.04, 0.06);
+        col = vec3<f32>(0.03, 0.03, 0.05);
         style = 0.0;
     }
 
@@ -237,7 +250,7 @@ fn eval_full_material(p: vec3<f32>) -> HitMaterial {
             best.d = pd;
             best.color = acol;
             best.style = asdf.z;
-            best.selected = select(0.0, 1.0, pr.info.z == 1u && u_frame.imp_norm_mode.w > 1.5 && u_frame.imp_norm_mode.w < 2.5);
+            best.selected = select(0.0, 1.0, pr.info.z == 1u && u_frame.imp_norm_mode.w < 2.5 && is_world_scope);
             best.in_active_scope = select(
                 select(0.0, 1.0, abs(f32(pr.info.x) - scoped_slot) < 0.25),
                 1.0,
@@ -357,6 +370,17 @@ fn ray_segment_glow(ro: vec3<f32>, rd: vec3<f32>, a: vec3<f32>, b: vec3<f32>, ma
 fn eval_editor_overlays(ro: vec3<f32>, rd: vec3<f32>, max_t: f32) -> vec4<f32> {
     let mode = u_frame.imp_norm_mode.w;
     if (mode > 2.5) {
+        // Play Mode X-Ray Silhouette Ring when solid trees/tunnels pass between camera and player!
+        let pup_center = u_frame.puppet_pos_yaw.xyz + vec3<f32>(0.0, 0.22, 0.0);
+        let to_pup = pup_center - ro;
+        let t_pup = dot(to_pup, rd);
+        if (t_pup > 0.5 && max_t < t_pup - 0.65) {
+            let perp = length((ro + rd * t_pup) - pup_center);
+            let sil_ring = 1.0 - smoothstep(0.03, 0.09, abs(perp - 0.38));
+            let sil_fill = (1.0 - smoothstep(0.0, 0.38, perp)) * 0.26;
+            let sil = max(sil_ring * 0.85, sil_fill);
+            return vec4<f32>(vec3<f32>(1.0, 0.68, 0.28) * sil, sil * 0.65);
+        }
         return vec4<f32>(0.0);
     }
 
