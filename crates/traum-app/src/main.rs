@@ -53,10 +53,13 @@ impl ApplicationHandler for TraumApp {
         );
 
         let size = window.inner_size();
+        let scale_factor = window.scale_factor() as f32;
         let renderer = TraumRenderer::new_windowed(window.clone())
             .expect("Failed to initialize wgpu renderer for Traum Engine");
 
-        self.input = Some(InputHub::new(size));
+        let mut hub = InputHub::new(size);
+        hub.set_scale_factor(scale_factor);
+        self.input = Some(hub);
         self.renderer = Some(renderer);
         self.window = Some(window.clone());
         self.last_frame_instant = Instant::now();
@@ -78,6 +81,8 @@ impl ApplicationHandler for TraumApp {
                 if kev.state.is_pressed() {
                     if self.editor.brush.mode == EditorMode::Play {
                         self.editor.switch_mode(EditorMode::Sculpt, &mut self.camera);
+                    } else if self.editor.scoped_prop_id.is_some() {
+                        self.editor.scope_out();
                     } else {
                         event_loop.exit();
                     }

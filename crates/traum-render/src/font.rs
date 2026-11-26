@@ -1,36 +1,179 @@
-//! Embedded crisp 8x8 ASCII bitmap font atlas (`128x48`, 16 columns x 6 rows for ASCII 32..=127).
-//! Zero external font file dependencies, instant startup, crisp UI labels across all platforms.
+//! High-clarity Signed Distance Field (SDF) ASCII font atlas (`512 x 192`, 16x6 grid of `32x32` SDF cells)
+//! with exact horizontally-centered ink bounds so characters never overlap at any scale.
 
-/// Returns `(width, height, r8_pixels)` for the 96 printable ASCII characters (`32..=127`).
+pub const CELL_PX: u32 = 32;
+pub const ATLAS_COLS: u32 = 16;
+pub const ATLAS_ROWS: u32 = 6;
+pub const ATLAS_WIDTH: u32 = ATLAS_COLS * CELL_PX; // 512
+pub const ATLAS_HEIGHT: u32 = ATLAS_ROWS * CELL_PX; // 192
+
+/// Ratio mapping desired `font_px` (8 bitmap rows = `24` texels) to full `32`-texel quad half-size (`16 / 24 = 2 / 3`).
+pub const QUAD_HALF_FACTOR: f32 = 16.0 / 24.0;
+
+/// Returns `(leftmost_col, rightmost_col)` in `0..8` for non-empty glyphs, or `(0, 2)` for space.
+fn glyph_col_span(ch: char) -> (i32, i32) {
+    let rows = glyph_8x8(ch);
+    let mut min_c = 8i32;
+    let mut max_c = -1i32;
+    for row in rows {
+        if row == 0 {
+            continue;
+        }
+        for c in 0..8i32 {
+            if (row >> (7 - c)) & 1 != 0 {
+                min_c = min_c.min(c);
+                max_c = max_c.max(c);
+            }
+        }
+    }
+    if max_c < min_c {
+        (0, 2)
+    } else {
+        (min_c, max_c)
+    }
+}
+
+/// Exact painted ink width of `ch` in units of `font_px` (`cols_used / 8.0`).
+pub fn glyph_ink_width_factor(ch: char) -> f32 {
+    if ch == ' ' {
+        return 0.0;
+    }
+    let (c0, c1) = glyph_col_span(ch);
+    ((c1 - c0 + 1) as f32) / 8.0
+}
+
+/// Horizontal advance of `ch` in units of `font_px` (exact ink width + clean inter-letter air gap!).
+pub fn glyph_advance_factor(ch: char) -> f32 {
+    if ch == ' ' {
+        0.38
+    } else {
+        glyph_ink_width_factor(ch) + 0.19
+    }
+}
+
+/// Measures the exact rendered pixel width of `text` at `font_px` height.
+pub fn measure_text_width(text: &str, font_px: f32) -> f32 {
+    let mut total = 0.0_f32;
+    let mut last_non_space = false;
+    for ch in text.chars() {
+        total += glyph_advance_factor(ch) * font_px;
+        last_non_space = ch != ' ';
+    }
+    if last_non_space {
+        // Trim trailing inter-character gap after the final letter so centered labels sit dead-center
+        (total - 0.19 * font_px).max(0.0)
+    } else {
+        total
+    }
+}
+
+/// Builds a smooth `512 x 192` `R8Unorm` Signed Distance Field font atlas for ASCII `32..=127`.
+/// Every glyph is horizontally centered around `px = 16.0` inside its `32x32` cell so `glyph_ink_width_factor`
+/// matches its exact painted texels 1-to-1 with zero overlap!
 pub fn build_font_atlas() -> (u32, u32, Vec<u8>) {
-    let cols = 16u32;
-    let rows = 6u32;
-    let cell = 8u32;
-    let width = cols * cell; // 128
-    let height = rows * cell; // 48
-    let mut pixels = vec![0u8; (width * height) as usize];
+    let mut pixels = vec![0u8; (ATLAS_WIDTH * ATLAS_HEIGHT) as usize];
+    let spread = 5.5_f32;
 
     for ascii in 32u8..=127u8 {
+        let ch = ascii as char;
         let idx = (ascii - 32) as u32;
-        let cx = (idx % cols) * cell;
-        let cy = (idx / cols) * cell;
-        let rows_bits = glyph_8x8(ascii as char);
-        for (ry, row_byte) in rows_bits.iter().enumerate() {
-            for rx in 0..8u32 {
-                let on = (row_byte >> (7 - rx)) & 1 != 0;
-                if on {
-                    let px = cx + rx;
-                    let py = cy + ry as u32;
-                    pixels[(py * width + px) as usize] = 255;
+        let cell_x = (idx % ATLAS_COLS) * CELL_PX;
+        let cell_y = (idx / ATLAS_COLS) * CELL_PX;
+        let rows_bits = glyph_8x8(ch);
+        let (c0, c1) = glyph_col_span(ch);
+        let glyph_center_col = (c0 as f32 + c1 as f32 + 1.0) * 0.5;
+
+        let mut inside = [[false; CELL_PX as usize]; CELL_PX as usize];
+        let bit_at = |gx: i32, gy: i32| -> bool {
+            if !(0..8).contains(&gx) || !(0..8).contains(&gy) {
+                return false;
+            }
+            (rows_bits[gy as usize] >> (7 - gx)) & 1 != 0
+        };
+
+        for py in 0..CELL_PX as i32 {
+            for px in 0..CELL_PX as i32 {
+                // Center glyph horizontally around texel 16.0; vertically map [4..28) -> [0..8)
+                let gx_f = (px as f32 - 16.0) / 3.0 + glyph_center_col;
+                let gy_f = (py as f32 - 4.0) / 3.0;
+                let gx = gx_f.floor() as i32;
+                let gy = gy_f.floor() as i32;
+                let fx = gx_f - gx as f32;
+                let fy = gy_f - gy as f32;
+
+                let mut on = bit_at(gx, gy);
+                if !on {
+                    if fx < 0.45 && fy < 0.45 && bit_at(gx - 1, gy) && bit_at(gx, gy - 1) && (fx + fy < 0.55) {
+                        on = true;
+                    }
+                    if fx > 0.55 && fy < 0.45 && bit_at(gx + 1, gy) && bit_at(gx, gy - 1) && ((1.0 - fx) + fy < 0.55) {
+                        on = true;
+                    }
+                    if fx < 0.45 && fy > 0.55 && bit_at(gx - 1, gy) && bit_at(gx, gy + 1) && (fx + (1.0 - fy) < 0.55) {
+                        on = true;
+                    }
+                    if fx > 0.55 && fy > 0.55 && bit_at(gx + 1, gy) && bit_at(gx, gy + 1) && ((1.0 - fx) + (1.0 - fy) < 0.55) {
+                        on = true;
+                    }
+                } else {
+                    if fx < 0.28 && fy < 0.28 && !bit_at(gx - 1, gy) && !bit_at(gx, gy - 1) && !bit_at(gx - 1, gy - 1) {
+                        on = false;
+                    }
+                    if fx > 0.72 && fy < 0.28 && !bit_at(gx + 1, gy) && !bit_at(gx, gy - 1) && !bit_at(gx + 1, gy - 1) {
+                        on = false;
+                    }
+                    if fx < 0.28 && fy > 0.72 && !bit_at(gx - 1, gy) && !bit_at(gx, gy + 1) && !bit_at(gx - 1, gy + 1) {
+                        on = false;
+                    }
+                    if fx > 0.72 && fy > 0.72 && !bit_at(gx + 1, gy) && !bit_at(gx, gy + 1) && !bit_at(gx + 1, gy + 1) {
+                        on = false;
+                    }
                 }
+                inside[py as usize][px as usize] = on;
+            }
+        }
+
+        let r_search = 6i32;
+        for py in 0..CELL_PX as i32 {
+            for px in 0..CELL_PX as i32 {
+                let state = inside[py as usize][px as usize];
+                let mut min_d2 = (spread * spread) + 10.0;
+                for dy in -r_search..=r_search {
+                    let ny = py + dy;
+                    if !(0..CELL_PX as i32).contains(&ny) {
+                        if state {
+                            min_d2 = min_d2.min((dy * dy) as f32);
+                        }
+                        continue;
+                    }
+                    for dx in -r_search..=r_search {
+                        let nx = px + dx;
+                        let neighbor_state = if (0..CELL_PX as i32).contains(&nx) {
+                            inside[ny as usize][nx as usize]
+                        } else {
+                            false
+                        };
+                        if neighbor_state != state {
+                            let d2 = (dx * dx + dy * dy) as f32;
+                            if d2 < min_d2 {
+                                min_d2 = d2;
+                            }
+                        }
+                    }
+                }
+                let dist = min_d2.sqrt() - 0.5;
+                let signed = if state { dist } else { -dist };
+                let norm = (0.5 + signed / (2.0 * spread)).clamp(0.0, 1.0);
+                let out_x = cell_x + px as u32;
+                let out_y = cell_y + py as u32;
+                pixels[(out_y * ATLAS_WIDTH + out_x) as usize] = (norm * 255.0).round() as u8;
             }
         }
     }
 
-    (width, height, pixels)
+    (ATLAS_WIDTH, ATLAS_HEIGHT, pixels)
 }
 
-/// Returns `(uv_min, uv_max)` in normalized `[0..1]` atlas coordinates for `ch`.
 pub fn glyph_uv(ch: char) -> ([f32; 2], [f32; 2]) {
     let code = if (' '..='~').contains(&ch) {
         ch as u8
@@ -38,12 +181,16 @@ pub fn glyph_uv(ch: char) -> ([f32; 2], [f32; 2]) {
         b'?'
     };
     let idx = (code - 32) as u32;
-    let col = (idx % 16) as f32;
-    let row = (idx / 16) as f32;
-    let u0 = (col * 8.0) / 128.0;
-    let v0 = (row * 8.0) / 48.0;
-    let u1 = ((col + 1.0) * 8.0) / 128.0;
-    let v1 = ((row + 1.0) * 8.0) / 48.0;
+    let col = (idx % ATLAS_COLS) as f32;
+    let row = (idx / ATLAS_COLS) as f32;
+    let w = ATLAS_WIDTH as f32;
+    let h = ATLAS_HEIGHT as f32;
+    let cell = CELL_PX as f32;
+    let pad = 0.5_f32;
+    let u0 = (col * cell + pad) / w;
+    let v0 = (row * cell + pad) / h;
+    let u1 = ((col + 1.0) * cell - pad) / w;
+    let v1 = ((row + 1.0) * cell - pad) / h;
     ([u0, v0], [u1, v1])
 }
 
@@ -51,10 +198,15 @@ fn glyph_8x8(ch: char) -> [u8; 8] {
     match ch {
         ' ' => [0x00; 8],
         '!' => [0x18, 0x3C, 0x3C, 0x18, 0x18, 0x00, 0x18, 0x00],
+        '"' => [0x66, 0x66, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00],
         '#' => [0x36, 0x36, 0x7F, 0x36, 0x7F, 0x36, 0x36, 0x00],
+        '$' => [0x18, 0x3E, 0x60, 0x3C, 0x06, 0x7C, 0x18, 0x00],
         '%' => [0x62, 0x64, 0x08, 0x10, 0x26, 0x46, 0x00, 0x00],
+        '&' => [0x38, 0x6C, 0x38, 0x76, 0xDC, 0xCC, 0x76, 0x00],
+        '\'' => [0x18, 0x18, 0x30, 0x00, 0x00, 0x00, 0x00, 0x00],
         '(' => [0x0C, 0x18, 0x30, 0x30, 0x30, 0x18, 0x0C, 0x00],
         ')' => [0x30, 0x18, 0x0C, 0x0C, 0x0C, 0x18, 0x30, 0x00],
+        '*' => [0x00, 0x66, 0x3C, 0xFF, 0x3C, 0x66, 0x00, 0x00],
         '+' => [0x00, 0x18, 0x18, 0x7E, 0x18, 0x18, 0x00, 0x00],
         ',' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x30],
         '-' => [0x00, 0x00, 0x00, 0x7E, 0x00, 0x00, 0x00, 0x00],
@@ -71,6 +223,12 @@ fn glyph_8x8(ch: char) -> [u8; 8] {
         '8' => [0x3C, 0x66, 0x66, 0x3C, 0x66, 0x66, 0x3C, 0x00],
         '9' => [0x3C, 0x66, 0x66, 0x3E, 0x06, 0x0C, 0x38, 0x00],
         ':' => [0x00, 0x18, 0x18, 0x00, 0x18, 0x18, 0x00, 0x00],
+        ';' => [0x00, 0x18, 0x18, 0x00, 0x18, 0x18, 0x30, 0x00],
+        '<' => [0x0C, 0x18, 0x30, 0x60, 0x30, 0x18, 0x0C, 0x00],
+        '=' => [0x00, 0x00, 0x7E, 0x00, 0x7E, 0x00, 0x00, 0x00],
+        '>' => [0x30, 0x18, 0x0C, 0x06, 0x0C, 0x18, 0x30, 0x00],
+        '?' => [0x3C, 0x66, 0x06, 0x1C, 0x18, 0x00, 0x18, 0x00],
+        '@' => [0x3C, 0x66, 0x6E, 0x6E, 0x60, 0x62, 0x3C, 0x00],
         'A' => [0x18, 0x3C, 0x66, 0x66, 0x7E, 0x66, 0x66, 0x00],
         'B' => [0x7C, 0x66, 0x66, 0x7C, 0x66, 0x66, 0x7C, 0x00],
         'C' => [0x3C, 0x66, 0x60, 0x60, 0x60, 0x66, 0x3C, 0x00],
@@ -97,6 +255,11 @@ fn glyph_8x8(ch: char) -> [u8; 8] {
         'X' => [0x66, 0x66, 0x3C, 0x18, 0x3C, 0x66, 0x66, 0x00],
         'Y' => [0x66, 0x66, 0x66, 0x3C, 0x18, 0x18, 0x18, 0x00],
         'Z' => [0x7E, 0x06, 0x0C, 0x18, 0x30, 0x60, 0x7E, 0x00],
+        '[' => [0x3C, 0x30, 0x30, 0x30, 0x30, 0x30, 0x3C, 0x00],
+        '\\' => [0x40, 0x60, 0x30, 0x18, 0x0C, 0x06, 0x02, 0x00],
+        ']' => [0x3C, 0x0C, 0x0C, 0x0C, 0x0C, 0x0C, 0x3C, 0x00],
+        '^' => [0x18, 0x3C, 0x66, 0x00, 0x00, 0x00, 0x00, 0x00],
+        '_' => [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7E, 0x00],
         'a' => [0x00, 0x00, 0x3C, 0x06, 0x3E, 0x66, 0x3E, 0x00],
         'b' => [0x60, 0x60, 0x7C, 0x66, 0x66, 0x66, 0x7C, 0x00],
         'c' => [0x00, 0x00, 0x3C, 0x66, 0x60, 0x66, 0x3C, 0x00],
@@ -123,6 +286,35 @@ fn glyph_8x8(ch: char) -> [u8; 8] {
         'x' => [0x00, 0x00, 0x66, 0x3C, 0x18, 0x3C, 0x66, 0x00],
         'y' => [0x00, 0x00, 0x66, 0x66, 0x66, 0x3E, 0x06, 0x3C],
         'z' => [0x00, 0x00, 0x7E, 0x0C, 0x18, 0x30, 0x7E, 0x00],
+        '~' => [0x00, 0x32, 0x7E, 0x4C, 0x00, 0x00, 0x00, 0x00],
         _ => [0x3C, 0x66, 0x0C, 0x18, 0x18, 0x00, 0x18, 0x00],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adjacent_glyph_ink_intervals_never_overlap() {
+        let font_px = 12.0_f32;
+        for sample in ["Sculpt", "Symmetry: OFF", "WM100%", "Edit Inside Toy"] {
+            let mut pen_x = 0.0_f32;
+            let mut prev_ink_end = -100.0_f32;
+            for ch in sample.chars() {
+                if ch != ' ' {
+                    let ink_w = glyph_ink_width_factor(ch) * font_px;
+                    let ink_start = pen_x;
+                    let ink_end = pen_x + ink_w;
+                    assert!(
+                        ink_start >= prev_ink_end + 1.5,
+                        "Expected >=1.5px gap before '{ch}' in \"{sample}\", got {}",
+                        ink_start - prev_ink_end
+                    );
+                    prev_ink_end = ink_end;
+                }
+                pen_x += glyph_advance_factor(ch) * font_px;
+            }
+        }
     }
 }

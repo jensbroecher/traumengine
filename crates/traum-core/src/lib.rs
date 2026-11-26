@@ -1,4 +1,5 @@
-//! Core types, sculpt edit lists, performative animation clips, and scene serialization for Traum Engine.
+//! Core types, reusable Sculpt Assets, CSG edit lists, multi-part puppet connectors,
+//! performative animation clips, and scene serialization for Traum Engine.
 
 use glam::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
@@ -53,7 +54,7 @@ impl SculptShape {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum SculptOp {
-    /// Smoothly adds clay to the world.
+    /// Smoothly adds clay to the sculpt.
     Add = 0,
     /// Smoothly carves/subtracts clay away.
     Subtract = 1,
@@ -117,11 +118,11 @@ impl FleckStyle {
 /// Top-level creative modes in Traum Engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EditorMode {
-    /// Sculpt clay (Add / Carve) with shapes, symmetry, and looseness.
+    /// Sculpt clay (Add / Carve) on the world or scoped into a custom Toy Prop!
     Sculpt,
     /// Re-coat existing clay with color, looseness, and living fleck styles.
     Paint,
-    /// Spawn, grab, and record live performative animations on props/toys.
+    /// Transform, clone, connect limbs, and record live animations on Toy Props.
     Animate,
     /// Drop in and explore your sculpted world with a playable bouncy character!
     Play,
@@ -180,7 +181,54 @@ impl MotionGadget {
     }
 }
 
-/// A single non-destructive CSG brush edit in the world sculpt list.
+/// Joint behavior connecting a child `SceneProp` to a parent `SceneProp` for multi-part puppets & contraptions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConnectorKind {
+    /// Bouncy secondary-motion ball joint that wobbles and lags organically behind parent movement.
+    BallSpring,
+    /// Motor/free-spinning hinge around local Y (windmills, propellers, spinning hats).
+    HingeSpin,
+    /// Rhythmic swinging hinge around local Z (wings, arms, hanging lanterns, tails).
+    HingeSwing,
+    /// Welded rigid attachment that follows parent pose 1:1.
+    Rigid,
+}
+
+impl ConnectorKind {
+    pub const ALL: [ConnectorKind; 4] = [
+        ConnectorKind::BallSpring,
+        ConnectorKind::HingeSpin,
+        ConnectorKind::HingeSwing,
+        ConnectorKind::Rigid,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            ConnectorKind::BallSpring => "Spring Ball",
+            ConnectorKind::HingeSpin => "Spin Hinge",
+            ConnectorKind::HingeSwing => "Swing Hinge",
+            ConnectorKind::Rigid => "Rigid Weld",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        let idx = (self as usize + 1) % Self::ALL.len();
+        Self::ALL[idx]
+    }
+}
+
+/// Articulated joint linking a child `SceneProp` to a parent `SceneProp`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PropConnector {
+    pub parent_id: u32,
+    /// Joint pivot in the parent's unscaled local space.
+    pub parent_anchor: Vec3,
+    /// Joint pivot in the child's unscaled local space (child rotates around this point!).
+    pub child_anchor: Vec3,
+    pub kind: ConnectorKind,
+}
+
+/// A single non-destructive CSG brush edit (in world space for `world_edits`, or local space inside a `SculptAsset`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SculptEdit {
     pub position: Vec3,
@@ -197,12 +245,34 @@ pub struct SculptEdit {
 }
 
 impl SculptEdit {
-    /// Conservative world-space AABB `(min, max)` touched by this edit (including smooth blend & loose shell).
+    /// Conservative AABB `(min, max)` touched by this edit (including smooth blend & loose shell).
     pub fn world_aabb(&self) -> (Vec3, Vec3) {
         let max_axis = self.scale.max_element();
         let radius = max_axis * 1.45 + self.blend * 1.35 + self.looseness * 0.65 + 0.35;
         let extent = Vec3::splat(radius);
         (self.position - extent, self.position + extent)
+    }
+}
+
+/// A reusable, multi-stroke custom SDF sculpt shared by one or more Live-Cloned `SceneProp` instances!
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SculptAsset {
+    pub id: u32,
+    pub name: String,
+    pub edits: Vec<SculptEdit>,
+}
+
+impl SculptAsset {
+    /// Conservative local-space bounding sphere radius around `Vec3::ZERO` for fast ray & frustum culling.
+    pub fn local_bound_radius(&self) -> f32 {
+        let mut max_r = 0.45_f32;
+        for e in &self.edits {
+            if e.op == SculptOp::Add {
+                let ext = e.scale.max_element() * 1.35 + e.blend * 0.8 + e.looseness * 0.35;
+                max_r = max_r.max(e.position.length() + ext);
+            }
+        }
+        max_r.min(3.3)
     }
 }
 
@@ -232,7 +302,6 @@ impl ActionClip {
         }
 
         let t = global_time.rem_euclid(self.duration);
-        // Find bracketing samples
         let mut idx = 0usize;
         while idx + 1 < self.samples.len() && self.samples[idx + 1].time < t {
             idx += 1;
@@ -243,14 +312,12 @@ impl ActionClip {
             let b = &self.samples[idx + 1];
             let span = (b.time - a.time).max(1e-4);
             let alpha = ((t - a.time) / span).clamp(0.0, 1.0);
-            // Smoothstep easing for organic hand-puppeteered feel
             let smooth = alpha * alpha * (3.0 - 2.0 * alpha);
             Some((
                 a.position.lerp(b.position, smooth),
                 a.rotation.slerp(b.rotation, smooth),
             ))
         } else {
-            // Smooth seam blend from last sample back to first sample
             let last = self.samples.last().unwrap();
             let first = &self.samples[0];
             let rem = (self.duration - last.time).max(0.05);
@@ -263,25 +330,56 @@ impl ActionClip {
     }
 }
 
-/// An independent, movable, animatable 3D toy prop in the scene.
+fn default_uniform_scale() -> f32 {
+    1.0
+}
+
+/// An independent, clonable,connectable, animatable 3D Toy Prop instance in the scene.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SceneProp {
     pub id: u32,
     pub name: String,
+    /// ID of the `SculptAsset` rendered by this prop (clones share the same `asset_id`!).
+    #[serde(default)]
+    pub asset_id: u32,
     pub base_position: Vec3,
     pub base_rotation: Quat,
+    /// Uniform instance scale (`0.2..3.5`) preserving exact Euclidean SDF distances.
+    #[serde(default = "default_uniform_scale")]
+    pub uniform_scale: f32,
+    /// Legacy fallback fields so older `.ron` files still load cleanly!
+    #[serde(default = "default_legacy_scale")]
     pub scale: Vec3,
+    #[serde(default = "default_legacy_shape")]
     pub shape: SculptShape,
+    #[serde(default = "default_legacy_color")]
     pub color: [f32; 3],
+    #[serde(default)]
     pub looseness: f32,
+    #[serde(default = "default_legacy_fleck")]
     pub fleck_style: FleckStyle,
     pub gadget: MotionGadget,
     pub clip: Option<ActionClip>,
+    #[serde(default)]
+    pub connector: Option<PropConnector>,
+}
+
+fn default_legacy_scale() -> Vec3 {
+    Vec3::ONE
+}
+fn default_legacy_shape() -> SculptShape {
+    SculptShape::Sphere
+}
+fn default_legacy_color() -> [f32; 3] {
+    [0.8, 0.45, 0.32]
+}
+fn default_legacy_fleck() -> FleckStyle {
+    FleckStyle::ClayImpasto
 }
 
 impl SceneProp {
-    /// Evaluates the animated world position and rotation at `time`.
-    pub fn evaluate_pose(&self, time: f32) -> (Vec3, Quat) {
+    /// Evaluates this prop's un-parented local/root pose `(pos, rot)` at `time`.
+    pub fn evaluate_self_pose(&self, time: f32) -> (Vec3, Quat) {
         let (mut pos, mut rot) = if let Some(clip) = &self.clip {
             clip.sample(time)
                 .unwrap_or((self.base_position, self.base_rotation))
@@ -314,7 +412,7 @@ impl SceneProp {
     }
 }
 
-/// Curated warm Dreams-inspired clay color palette (linear RGB).
+/// Curated warm Dreams-inspired clay color palette (sRGB).
 pub const PALETTE_SRGB: [[f32; 3]; 12] = [
     [0.88, 0.46, 0.32], // Warm Terracotta Clay
     [0.94, 0.76, 0.42], // Sunlit Ochre Gold
@@ -339,6 +437,10 @@ pub fn srgb_to_linear(c: [f32; 3]) -> [f32; 3] {
 pub struct TraumScene {
     pub title: String,
     pub world_edits: Vec<SculptEdit>,
+    #[serde(default)]
+    pub assets: Vec<SculptAsset>,
+    #[serde(default = "default_next_asset_id")]
+    pub next_asset_id: u32,
     pub props: Vec<SceneProp>,
     pub next_prop_id: u32,
     pub sun_azimuth: f32,
@@ -346,8 +448,123 @@ pub struct TraumScene {
     pub dof_amount: f32,
 }
 
+fn default_next_asset_id() -> u32 {
+    1
+}
+
 impl TraumScene {
-    /// Builds the sunlit "Floating Diorama Island" starter scene out of real editable SDF strokes!
+    pub fn asset_by_id(&self, asset_id: u32) -> Option<&SculptAsset> {
+        self.assets.iter().find(|a| a.id == asset_id)
+    }
+
+    pub fn asset_by_id_mut(&mut self, asset_id: u32) -> Option<&mut SculptAsset> {
+        self.assets.iter_mut().find(|a| a.id == asset_id)
+    }
+
+    /// Evaluates the full hierarchical world `(position, rotation)` of `prop_id` at `time`,
+    /// resolving parent connectors (`BallSpring` lag/wobble, `HingeSpin`, `HingeSwing`, `Rigid`)!
+    pub fn evaluate_prop_pose(&self, prop_id: u32, time: f32) -> (Vec3, Quat) {
+        self.evaluate_prop_pose_depth(prop_id, time, 0)
+    }
+
+    fn evaluate_prop_pose_depth(&self, prop_id: u32, time: f32, depth: u32) -> (Vec3, Quat) {
+        let Some(prop) = self.props.iter().find(|p| p.id == prop_id) else {
+            return (Vec3::ZERO, Quat::IDENTITY);
+        };
+
+        if depth >= 6 {
+            return prop.evaluate_self_pose(time);
+        }
+
+        let Some(conn) = &prop.connector else {
+            return prop.evaluate_self_pose(time);
+        };
+
+        let Some(parent) = self.props.iter().find(|p| p.id == conn.parent_id) else {
+            return prop.evaluate_self_pose(time);
+        };
+
+        let (p_pos, p_rot) = self.evaluate_prop_pose_depth(parent.id, time, depth + 1);
+        let pivot_world = p_pos + p_rot * (conn.parent_anchor * parent.uniform_scale.max(0.1));
+
+        // Child's own local animation/pose offset around its base
+        let (_, self_rot) = if let Some(clip) = &prop.clip {
+            clip.sample(time)
+                .unwrap_or((prop.base_position, prop.base_rotation))
+        } else {
+            (prop.base_position, prop.base_rotation)
+        };
+
+        let phase = prop.id as f32 * 1.91;
+        let joint_rot = match conn.kind {
+            ConnectorKind::Rigid => p_rot * self_rot,
+            ConnectorKind::BallSpring => {
+                // Sample parent velocity slightly behind in time for juicy secondary spring follow-through!
+                let (p_prev, _) =
+                    self.evaluate_prop_pose_depth(parent.id, (time - 0.09).max(0.0), depth + 1);
+                let vel = (p_pos - p_prev) / 0.09;
+                let lag_pitch = (-vel.z * 0.085).clamp(-0.55, 0.55);
+                let lag_roll = (vel.x * 0.085).clamp(-0.55, 0.55);
+                let bounce_wobble = (-vel.y * 0.06).clamp(-0.35, 0.35)
+                    + (time * 5.2 + phase).sin() * 0.07;
+                let spring_q = Quat::from_rotation_z(lag_roll + bounce_wobble)
+                    * Quat::from_rotation_x(lag_pitch);
+                spring_q * p_rot * self_rot
+            }
+            ConnectorKind::HingeSpin => {
+                let spin_q = Quat::from_rotation_y(time * 2.6 + phase);
+                p_rot * spin_q * self_rot
+            }
+            ConnectorKind::HingeSwing => {
+                let swing_q = Quat::from_rotation_z((time * 3.4 + phase).sin() * 0.62);
+                p_rot * swing_q * self_rot
+            }
+        };
+
+        let child_pos = pivot_world - joint_rot * (conn.child_anchor * prop.uniform_scale.max(0.1));
+        (child_pos, joint_rot)
+    }
+
+    /// Returns world-space `(parent_pivot, child_center)` for rendering visual joint connectors.
+    pub fn evaluate_connector_segment(&self, prop: &SceneProp, time: f32) -> Option<(Vec3, Vec3)> {
+        let conn = prop.connector.as_ref()?;
+        let parent = self.props.iter().find(|p| p.id == conn.parent_id)?;
+        let (p_pos, p_rot) = self.evaluate_prop_pose(parent.id, time);
+        let pivot = p_pos + p_rot * (conn.parent_anchor * parent.uniform_scale.max(0.1));
+        let (c_pos, _) = self.evaluate_prop_pose(prop.id, time);
+        Some((pivot, c_pos))
+    }
+
+    /// Upgrades any legacy `.ron` scene whose `props` didn't have `SculptAsset`s yet.
+    pub fn migrate_legacy_props(&mut self) {
+        for prop in &mut self.props {
+            if prop.uniform_scale <= 0.001 {
+                prop.uniform_scale = 1.0;
+            }
+            if prop.asset_id == 0 || !self.assets.iter().any(|a| a.id == prop.asset_id) {
+                let aid = self.next_asset_id.max(1);
+                self.next_asset_id = aid + 1;
+                self.assets.push(SculptAsset {
+                    id: aid,
+                    name: format!("{} Sculpt", prop.name),
+                    edits: vec![SculptEdit {
+                        position: Vec3::ZERO,
+                        rotation: Quat::IDENTITY,
+                        scale: prop.scale,
+                        shape: prop.shape,
+                        op: SculptOp::Add,
+                        blend: 0.15,
+                        color: prop.color,
+                        looseness: prop.looseness,
+                        fleck_style: prop.fleck_style,
+                    }],
+                });
+                prop.asset_id = aid;
+            }
+        }
+    }
+
+    /// Builds the sunlit "Floating Diorama Island" starter scene with custom multi-stroke Sculpt Assets & Connected Puppets!
     pub fn starter_diorama_island() -> Self {
         let mut edits = Vec::new();
 
@@ -359,6 +576,8 @@ impl TraumScene {
         let trunk_brown = srgb_to_linear([0.48, 0.34, 0.24]);
         let cloud_cream = srgb_to_linear([0.96, 0.94, 0.90]);
         let lantern_gold = srgb_to_linear([1.0, 0.70, 0.24]);
+        let sky_blue = srgb_to_linear([0.38, 0.64, 0.88]);
+        let charcoal = srgb_to_linear([0.16, 0.17, 0.22]);
 
         // 1. Floating island rocky underside & terracotta cliff base
         edits.push(SculptEdit {
@@ -389,13 +608,16 @@ impl TraumScene {
             position: Vec3::new(0.0, 1.8, 0.0),
             rotation: Quat::IDENTITY,
             scale: Vec3::new(8.5, 1.8, 8.5),
-            shape: SculptShape::RoundedBox,
+            shape: SculptOp::Subtract.default_scale_or(Vec3::new(8.5, 1.8, 8.5)),
             op: SculptOp::Subtract,
             blend: 0.35,
             color: terracotta,
             looseness: 0.1,
             fleck_style: FleckStyle::ClayImpasto,
         });
+        // Fix shape explicitly to RoundedBox as before
+        edits.last_mut().unwrap().shape = SculptShape::RoundedBox;
+
         edits.push(SculptEdit {
             position: Vec3::new(0.0, -0.35, 0.0),
             rotation: Quat::IDENTITY,
@@ -431,7 +653,6 @@ impl TraumScene {
             looseness: 0.45,
             fleck_style: FleckStyle::FoliageBreeze,
         });
-        // Carve a playful walkable tunnel arch right through the hill!
         edits.push(SculptEdit {
             position: Vec3::new(-2.4, 0.75, -1.8),
             rotation: Quat::from_rotation_x(std::f32::consts::FRAC_PI_2)
@@ -507,54 +728,249 @@ impl TraumScene {
             fleck_style: FleckStyle::GlowEmber,
         });
 
-        // 7. Interactive animated Toy Props ready to poke, record, or hop on!
+        // ====================================================================
+        // 7. Reusable Custom Multi-Stroke Sculpt Assets!
+        //    Scope into any prop (`Enter`) to sculpt right on it — all Live Clones update at once!
+        // ====================================================================
+        let assets = vec![
+            // Asset 1: Mossy Floating Stepping Platform (2 Live Clones in starter scene!)
+            SculptAsset {
+                id: 1,
+                name: "Mossy Stepping Stone".into(),
+                edits: vec![
+                    SculptEdit {
+                        position: Vec3::new(0.0, -0.10, 0.0),
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::new(1.15, 0.30, 1.15),
+                        shape: SculptShape::Cylinder,
+                        op: SculptOp::Add,
+                        blend: 0.18,
+                        color: terracotta,
+                        looseness: 0.18,
+                        fleck_style: FleckStyle::ClayImpasto,
+                    },
+                    SculptEdit {
+                        position: Vec3::new(0.0, 0.14, 0.0),
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::new(1.06, 0.16, 1.06),
+                        shape: SculptShape::Cylinder,
+                        op: SculptOp::Add,
+                        blend: 0.22,
+                        color: moss_green,
+                        looseness: 0.42,
+                        fleck_style: FleckStyle::FoliageBreeze,
+                    },
+                ],
+            },
+            // Asset 2: Ornate Glowing Sky Ring
+            SculptAsset {
+                id: 2,
+                name: "Sunlit Sky Ring".into(),
+                edits: vec![
+                    SculptEdit {
+                        position: Vec3::ZERO,
+                        rotation: Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+                        scale: Vec3::new(0.82, 0.20, 0.82),
+                        shape: SculptShape::Torus,
+                        op: SculptOp::Add,
+                        blend: 0.12,
+                        color: lantern_gold,
+                        looseness: 0.36,
+                        fleck_style: FleckStyle::GlowEmber,
+                    },
+                    SculptEdit {
+                        position: Vec3::ZERO,
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::splat(0.26),
+                        shape: SculptShape::Sphere,
+                        op: SculptOp::Add,
+                        blend: 0.15,
+                        color: cloud_cream,
+                        looseness: 0.45,
+                        fleck_style: FleckStyle::GlowEmber,
+                    },
+                ],
+            },
+            // Asset 3: Sculpted Bouncy Critter Body (with eyes & rosy cheeks!)
+            SculptAsset {
+                id: 3,
+                name: "Critter Body".into(),
+                edits: vec![
+                    SculptEdit {
+                        position: Vec3::ZERO,
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::new(0.56, 0.50, 0.54),
+                        shape: SculptShape::Sphere,
+                        op: SculptOp::Add,
+                        blend: 0.18,
+                        color: sky_blue,
+                        looseness: 0.42,
+                        fleck_style: FleckStyle::SketchBoil,
+                    },
+                    SculptEdit {
+                        position: Vec3::new(-0.18, 0.12, 0.44),
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::splat(0.11),
+                        shape: SculptShape::Sphere,
+                        op: SculptOp::Add,
+                        blend: 0.04,
+                        color: charcoal,
+                        looseness: 0.08,
+                        fleck_style: FleckStyle::ClayImpasto,
+                    },
+                    SculptEdit {
+                        position: Vec3::new(0.18, 0.12, 0.44),
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::splat(0.11),
+                        shape: SculptShape::Sphere,
+                        op: SculptOp::Add,
+                        blend: 0.04,
+                        color: charcoal,
+                        looseness: 0.08,
+                        fleck_style: FleckStyle::ClayImpasto,
+                    },
+                ],
+            },
+            // Asset 4: Sculpted Bunny-Ear Sprout Hat (connected to Critter Body via BallSpring joint!)
+            SculptAsset {
+                id: 4,
+                name: "Sprout Ears Hat".into(),
+                edits: vec![
+                    SculptEdit {
+                        position: Vec3::new(0.0, 0.06, 0.0),
+                        rotation: Quat::IDENTITY,
+                        scale: Vec3::new(0.34, 0.16, 0.34),
+                        shape: SculptShape::Sphere,
+                        op: SculptOp::Add,
+                        blend: 0.14,
+                        color: blossom_pink,
+                        looseness: 0.36,
+                        fleck_style: FleckStyle::SketchBoil,
+                    },
+                    SculptEdit {
+                        position: Vec3::new(-0.20, 0.38, 0.0),
+                        rotation: Quat::from_rotation_z(0.24),
+                        scale: Vec3::new(0.12, 0.34, 0.10),
+                        shape: SculptShape::Capsule,
+                        op: SculptOp::Add,
+                        blend: 0.14,
+                        color: blossom_pink,
+                        looseness: 0.44,
+                        fleck_style: FleckStyle::SketchBoil,
+                    },
+                    SculptEdit {
+                        position: Vec3::new(0.20, 0.38, 0.0),
+                        rotation: Quat::from_rotation_z(-0.24),
+                        scale: Vec3::new(0.12, 0.34, 0.10),
+                        shape: SculptShape::Capsule,
+                        op: SculptOp::Add,
+                        blend: 0.14,
+                        color: blossom_pink,
+                        looseness: 0.44,
+                        fleck_style: FleckStyle::SketchBoil,
+                    },
+                ],
+            },
+        ];
+
         let props = vec![
             SceneProp {
                 id: 1,
-                name: "Floating Stepping Stone".into(),
-                base_position: Vec3::new(0.4, 1.4, 2.8),
+                name: "Stepping Stone A".into(),
+                asset_id: 1,
+                base_position: Vec3::new(0.4, 1.35, 2.8),
                 base_rotation: Quat::IDENTITY,
-                scale: Vec3::new(1.15, 0.32, 1.15),
+                uniform_scale: 1.0,
+                scale: Vec3::ONE,
                 shape: SculptShape::Cylinder,
-                color: srgb_to_linear([0.88, 0.46, 0.32]),
-                looseness: 0.22,
+                color: terracotta,
+                looseness: 0.25,
                 fleck_style: FleckStyle::ClayImpasto,
                 gadget: MotionGadget::HoverBob,
                 clip: None,
+                connector: None,
             },
+            // Live Clone of Asset #1 leading higher up toward the arch!
             SceneProp {
                 id: 2,
+                name: "Stepping Stone B (Clone)".into(),
+                asset_id: 1,
+                base_position: Vec3::new(-1.35, 2.25, 1.55),
+                base_rotation: Quat::from_rotation_y(0.6),
+                uniform_scale: 0.82,
+                scale: Vec3::ONE,
+                shape: SculptShape::Cylinder,
+                color: terracotta,
+                looseness: 0.25,
+                fleck_style: FleckStyle::ClayImpasto,
+                gadget: MotionGadget::HoverBob,
+                clip: None,
+                connector: None,
+            },
+            SceneProp {
+                id: 3,
                 name: "Spinning Sky Ring".into(),
-                base_position: Vec3::new(-2.4, 4.1, -1.8),
-                base_rotation: Quat::from_rotation_x(0.4),
-                scale: Vec3::new(0.75, 0.22, 0.75),
+                asset_id: 2,
+                base_position: Vec3::new(-2.4, 4.15, -1.8),
+                base_rotation: Quat::IDENTITY,
+                uniform_scale: 0.95,
+                scale: Vec3::ONE,
                 shape: SculptShape::Torus,
                 color: lantern_gold,
                 looseness: 0.40,
                 fleck_style: FleckStyle::GlowEmber,
                 gadget: MotionGadget::Spin,
                 clip: None,
+                connector: None,
             },
+            // Multi-part Puppet Root: Bouncy Sketch Critter Body
             SceneProp {
-                id: 3,
-                name: "Bouncy Sketch Critter".into(),
+                id: 4,
+                name: "Bouncy Critter".into(),
+                asset_id: 3,
                 base_position: Vec3::new(1.6, 0.55, 1.3),
-                base_rotation: Quat::IDENTITY,
-                scale: Vec3::splat(0.52),
+                base_rotation: Quat::from_rotation_y(-0.45),
+                uniform_scale: 1.0,
+                scale: Vec3::ONE,
                 shape: SculptShape::Sphere,
-                color: srgb_to_linear([0.38, 0.64, 0.88]),
-                looseness: 0.50,
+                color: sky_blue,
+                looseness: 0.45,
                 fleck_style: FleckStyle::SketchBoil,
                 gadget: MotionGadget::BouncyHop,
                 clip: None,
+                connector: None,
+            },
+            // Multi-part Puppet Child: Connected via BallSpring joint so its ears bobble as the critter hops!
+            SceneProp {
+                id: 5,
+                name: "Critter Sprout Ears".into(),
+                asset_id: 4,
+                base_position: Vec3::new(1.6, 1.05, 1.3),
+                base_rotation: Quat::IDENTITY,
+                uniform_scale: 1.0,
+                scale: Vec3::ONE,
+                shape: SculptShape::Sphere,
+                color: blossom_pink,
+                looseness: 0.45,
+                fleck_style: FleckStyle::SketchBoil,
+                gadget: MotionGadget::None,
+                clip: None,
+                connector: Some(PropConnector {
+                    parent_id: 4,
+                    parent_anchor: Vec3::new(0.0, 0.46, 0.0),
+                    child_anchor: Vec3::new(0.0, -0.04, 0.0),
+                    kind: ConnectorKind::BallSpring,
+                }),
             },
         ];
 
         Self {
             title: "Floating Diorama Island".into(),
             world_edits: edits,
+            assets,
+            next_asset_id: 5,
             props,
-            next_prop_id: 4,
+            next_prop_id: 6,
             sun_azimuth: 0.72,
             sun_elevation: 0.68,
             dof_amount: 0.35,
@@ -569,7 +985,18 @@ impl TraumScene {
 
     pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self, String> {
         let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
-        ron::from_str(&text).map_err(|e| e.to_string())
+        let mut scene: Self = ron::from_str(&text).map_err(|e| e.to_string())?;
+        scene.migrate_legacy_props();
+        Ok(scene)
+    }
+}
+
+trait SculptOpExt {
+    fn default_scale_or(self, v: Vec3) -> SculptShape;
+}
+impl SculptOpExt for SculptOp {
+    fn default_scale_or(self, _v: Vec3) -> SculptShape {
+        SculptShape::RoundedBox
     }
 }
 
@@ -578,12 +1005,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn starter_island_roundtrips_ron() {
+    fn starter_island_roundtrips_ron_with_assets_and_connectors() {
         let scene = TraumScene::starter_diorama_island();
         let serialized = ron::to_string(&scene).expect("serialize scene");
         let restored: TraumScene = ron::from_str(&serialized).expect("deserialize scene");
         assert_eq!(scene.world_edits.len(), restored.world_edits.len());
+        assert_eq!(scene.assets.len(), restored.assets.len());
         assert_eq!(scene.props.len(), restored.props.len());
+
+        // Verify connected child prop (id=5) tracks hopping parent prop (id=4)!
+        let (parent_p, _) = restored.evaluate_prop_pose(4, 0.35);
+        let (child_p, _) = restored.evaluate_prop_pose(5, 0.35);
+        assert!(
+            child_p.y > parent_p.y + 0.3,
+            "Connected sprout ears should sit atop hopping critter body"
+        );
     }
 
     #[test]

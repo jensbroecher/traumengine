@@ -109,7 +109,7 @@ impl CameraRig {
         (self.eye_position(), dir)
     }
 
-    /// Projects a 3D world point to screen pixel coordinates `(px_x, px_y, clip_w)`.
+    /// Projects a 3D world point to screen pixel coordinates `(px_x, px_y)`.
     pub fn world_to_screen(&self, world_pos: Vec3, viewport: Vec2) -> Option<Vec2> {
         let aspect = viewport.x.max(1.0) / viewport.y.max(1.0);
         let clip = self.view_proj(aspect) * world_pos.extend(1.0);
@@ -136,7 +136,7 @@ impl CameraRig {
     }
 
     pub fn zoom(&mut self, factor: f32) {
-        self.target_distance = (self.target_distance * factor).clamp(2.4, 34.0);
+        self.target_distance = (self.target_distance * factor).clamp(1.8, 34.0);
     }
 
     pub fn update(&mut self, dt: f32) {
@@ -153,13 +153,15 @@ impl CameraRig {
 pub struct FrameInput {
     pub imp_px: Vec2,
     pub viewport: Vec2,
+    /// Display DPI scale factor (`1.0` = standard 96dpi, `2.0` = 200% HiDPI). `0.0` defaults to `1.0`.
+    pub ui_scale: f32,
     pub primary_down: bool,
     pub primary_just_pressed: bool,
     pub primary_just_released: bool,
     /// Analog brush/trigger pressure (`0.0..1.0`, defaults to `1.0` for mouse).
     pub pressure: f32,
     pub carve_modifier: bool,
-    /// True if a 1-finger touch transitioned into a 2-finger pinch/orbit within 120ms.
+    /// True if a 1-finger touch transitioned into a 2-finger pinch/orbit within 140ms.
     pub cancel_active_stroke: bool,
 
     pub radial_open: bool,
@@ -176,6 +178,11 @@ pub struct FrameInput {
     pub cycle_fleck: bool,
     pub toggle_play: bool,
     pub spawn_prop: bool,
+    pub toggle_scope: bool,
+    pub clone_prop: bool,
+    pub make_unique: bool,
+    pub spawn_child_part: bool,
+    pub delete_selected: bool,
     pub toggle_record: bool,
     pub save_requested: bool,
     pub reload_requested: bool,
@@ -190,6 +197,7 @@ pub struct FrameInput {
 pub struct InputHub {
     pub active_device: ActiveInputDevice,
     viewport: Vec2,
+    scale_factor: f32,
     imp_px: Vec2,
 
     // Mouse & Keyboard state
@@ -229,6 +237,8 @@ pub struct InputHub {
     gp_cycle_fleck: bool,
     gp_toggle_mirror: bool,
     gp_toggle_play: bool,
+    gp_toggle_scope: bool,
+    gp_clone_prop: bool,
     gp_jump: bool,
 }
 
@@ -246,6 +256,7 @@ impl InputHub {
         Self {
             active_device: ActiveInputDevice::MouseKeyboard,
             viewport,
+            scale_factor: 1.0,
             imp_px: viewport * 0.5,
             keys_down: HashSet::new(),
             keys_just_pressed: HashSet::new(),
@@ -279,6 +290,8 @@ impl InputHub {
             gp_cycle_fleck: false,
             gp_toggle_mirror: false,
             gp_toggle_play: false,
+            gp_toggle_scope: false,
+            gp_clone_prop: false,
             gp_jump: false,
         }
     }
@@ -286,6 +299,10 @@ impl InputHub {
     pub fn set_viewport(&mut self, size: PhysicalSize<u32>) {
         self.viewport = Vec2::new(size.width.max(1) as f32, size.height.max(1) as f32);
         self.imp_px = self.imp_px.clamp(Vec2::ZERO, self.viewport);
+    }
+
+    pub fn set_scale_factor(&mut self, factor: f32) {
+        self.scale_factor = factor.clamp(0.75, 3.5);
     }
 
     pub fn handle_window_event(
@@ -297,6 +314,9 @@ impl InputHub {
         match event {
             WindowEvent::Resized(size) => {
                 self.set_viewport(*size);
+            }
+            WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                self.set_scale_factor(*scale_factor as f32);
             }
             WindowEvent::CursorMoved { position, .. } => {
                 self.active_device = ActiveInputDevice::MouseKeyboard;
@@ -398,7 +418,6 @@ impl InputHub {
                     self.touch_just_pressed = true;
                     self.touch_was_single_sculpting = true;
                 } else if self.touches.len() == 2 && self.touch_was_single_sculpting {
-                    // Procreate/Nomad disambiguation: 2nd finger landed right after 1st -> cancel stroke & switch to camera!
                     if self.touch_gesture_duration < 0.14 {
                         self.cancel_stroke_flag = true;
                     }
@@ -432,7 +451,6 @@ impl InputHub {
                     let curr_dist = a.pos.distance(b.pos).max(8.0);
                     let zoom_ratio = prev_dist / curr_dist;
 
-                    // Only apply half per finger event so 2 moved events match 1x gesture speed
                     camera.orbit(mid_delta.x * 0.0032, mid_delta.y * 0.0032);
                     camera.zoom(zoom_ratio.powf(0.65));
                 }
@@ -447,7 +465,6 @@ impl InputHub {
                         self.touch_just_released = true;
                         self.touch_was_single_sculpting = false;
                     } else if self.touch_gesture_duration < 0.24 {
-                        // Quick multi-finger tap shortcuts (2-finger tap = Undo, 3-finger tap = Redo!)
                         if self.max_simultaneous_touches == 2 {
                             self.touch_undo_flag = true;
                         } else if self.max_simultaneous_touches >= 3 {
@@ -471,7 +488,6 @@ impl InputHub {
             t.age += dt;
         }
 
-        // Poll Gamepad via gilrs
         let mut gp_radial_held = false;
         let mut gp_radial_dir = None;
         let mut gp_pressure = 0.0_f32;
@@ -489,6 +505,8 @@ impl InputHub {
                         Button::North => self.gp_cycle_shape = true,
                         Button::East => self.gp_cycle_fleck = true,
                         Button::West => self.gp_toggle_mirror = true,
+                        Button::RightTrigger => self.gp_toggle_scope = true, // R1 / RB = Scope In / Out!
+                        Button::Select => self.gp_clone_prop = true,         // Select = Live Clone!
                         Button::Start => self.gp_toggle_play = true,
                         Button::South if is_play_mode => self.gp_jump = true,
                         _ => {}
@@ -496,7 +514,6 @@ impl InputHub {
                 }
             }
 
-            // Read active gamepad analog sticks & triggers
             for (_id, gp) in gilrs.gamepads() {
                 if !gp.is_connected() {
                     continue;
@@ -540,11 +557,11 @@ impl InputHub {
                             gp_radial_dir = Some(stick.normalize());
                         }
                     } else {
-                        // Right stick drives the 3D Imp cursor smoothly across the screen
                         let imp_speed = 680.0 * dt;
-                        self.imp_px.x = (self.imp_px.x + rx * imp_speed).clamp(0.0, self.viewport.x);
-                        self.imp_px.y = (self.imp_px.y - ry * imp_speed).clamp(0.0, self.viewport.y);
-                        // Left stick orbits camera around diorama!
+                        self.imp_px.x =
+                            (self.imp_px.x + rx * imp_speed).clamp(0.0, self.viewport.x);
+                        self.imp_px.y =
+                            (self.imp_px.y - ry * imp_speed).clamp(0.0, self.viewport.y);
                         camera.orbit(lx * dt * 1.9, -ly * dt * 1.4);
                     }
 
@@ -569,7 +586,6 @@ impl InputHub {
         let gp_radial_just_released = !gp_radial_held && self.gp_radial_prev;
         self.gp_radial_prev = gp_radial_held;
 
-        // Keyboard camera / character handling
         let ctrl = self.is_ctrl_down();
         let shift = self.is_shift_down();
         let alt = self.is_alt_down();
@@ -598,7 +614,8 @@ impl InputHub {
         }
 
         if !is_play_mode && kb_move.length_squared() > 0.0 {
-            let flat_fwd = Vec3::new(camera.forward().x, 0.0, camera.forward().z).normalize_or_zero();
+            let flat_fwd =
+                Vec3::new(camera.forward().x, 0.0, camera.forward().z).normalize_or_zero();
             let flat_right = camera.right();
             let speed = camera.target_distance * 0.85 * dt;
             camera.target_focus += (flat_fwd * kb_move.y + flat_right * kb_move.x) * speed;
@@ -612,7 +629,6 @@ impl InputHub {
             }
         }
 
-        // Scroll wheel: plain = camera zoom, Shift = Brush Size, Ctrl = Brush Blend!
         let mut brush_size_delta = gp_size_delta;
         let mut brush_blend_delta = 0.0_f32;
         if self.scroll_delta_y.abs() > 0.001 {
@@ -633,7 +649,6 @@ impl InputHub {
 
         camera.update(dt);
 
-        // Touch virtual thumbstick in Play Mode
         let mut touch_move = Vec2::ZERO;
         if let Some(stick_id) = self.play_virtual_stick_id {
             if let Some(f) = self.touches.iter().find(|t| t.id == stick_id) {
@@ -648,7 +663,8 @@ impl InputHub {
         let kb_radial = !is_play_mode && self.keys_down.contains(&KeyCode::Space);
         let kb_radial_released = !is_play_mode && self.keys_just_released.contains(&KeyCode::Space);
 
-        let touch_primary_down = !is_play_mode && self.touches.len() == 1 && self.touch_was_single_sculpting;
+        let touch_primary_down =
+            !is_play_mode && self.touches.len() == 1 && self.touch_was_single_sculpting;
 
         let primary_down = self.mouse_left_down || touch_primary_down || self.gp_primary_down;
         let primary_just_pressed =
@@ -685,6 +701,7 @@ impl InputHub {
         let out = FrameInput {
             imp_px: self.imp_px,
             viewport: self.viewport,
+            ui_scale: self.scale_factor,
             primary_down,
             primary_just_pressed,
             primary_just_released,
@@ -703,6 +720,16 @@ impl InputHub {
             cycle_fleck: self.keys_just_pressed.contains(&KeyCode::KeyG) || self.gp_cycle_fleck,
             toggle_play: self.keys_just_pressed.contains(&KeyCode::Tab) || self.gp_toggle_play,
             spawn_prop: self.keys_just_pressed.contains(&KeyCode::KeyP),
+            toggle_scope: self.keys_just_pressed.contains(&KeyCode::Enter)
+                || self.keys_just_pressed.contains(&KeyCode::KeyV)
+                || self.gp_toggle_scope,
+            clone_prop: (!ctrl && self.keys_just_pressed.contains(&KeyCode::KeyC))
+                || (ctrl && self.keys_just_pressed.contains(&KeyCode::KeyD))
+                || self.gp_clone_prop,
+            make_unique: self.keys_just_pressed.contains(&KeyCode::KeyU),
+            spawn_child_part: self.keys_just_pressed.contains(&KeyCode::KeyL),
+            delete_selected: self.keys_just_pressed.contains(&KeyCode::Delete)
+                || self.keys_just_pressed.contains(&KeyCode::Backspace),
             toggle_record: self.keys_just_pressed.contains(&KeyCode::KeyR),
             save_requested: (ctrl && self.keys_just_pressed.contains(&KeyCode::KeyS))
                 || self.keys_just_pressed.contains(&KeyCode::F5),
@@ -714,7 +741,6 @@ impl InputHub {
                 || self.gp_jump,
         };
 
-        // Clear one-shot per-frame edge flags
         self.keys_just_pressed.clear();
         self.keys_just_released.clear();
         self.mouse_left_just_pressed = false;
@@ -732,6 +758,8 @@ impl InputHub {
         self.gp_cycle_fleck = false;
         self.gp_toggle_mirror = false;
         self.gp_toggle_play = false;
+        self.gp_toggle_scope = false;
+        self.gp_clone_prop = false;
         self.gp_jump = false;
 
         out
